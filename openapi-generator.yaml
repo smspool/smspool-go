@@ -1,0 +1,9 @@
+generatorName: go
+gitHost: github.com
+gitUserId: smspool
+gitRepoId: smspool-go
+additionalProperties:
+  packageName: smspool
+  packageVersion: 0.1.0
+  isGoSubmodule: false
+  generateInterfaces: true
