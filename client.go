@@ -53,8 +53,6 @@ type APIClient struct {
 
 	CarrierAPI CarrierAPI
 
-	ESIMsAPI ESIMsAPI
-
 	InformationAPI InformationAPI
 
 	PreordersAPI PreordersAPI
@@ -86,7 +84,6 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 	// API Services
 	c.BusinessAPI = (*BusinessAPIService)(&c.common)
 	c.CarrierAPI = (*CarrierAPIService)(&c.common)
-	c.ESIMsAPI = (*ESIMsAPIService)(&c.common)
 	c.InformationAPI = (*InformationAPIService)(&c.common)
 	c.PreordersAPI = (*PreordersAPIService)(&c.common)
 	c.PricingAPI = (*PricingAPIService)(&c.common)
