@@ -8,6 +8,7 @@ Method | HTTP request | Description
 [**PoolRetrieveAll**](InformationAPI.md#PoolRetrieveAll) | **Post** /pool/retrieve_all | Pool list
 [**PoolRetrieveValid**](InformationAPI.md#PoolRetrieveValid) | **Post** /pool/retrieve_valid | Suggested Pools
 [**RequestBalance**](InformationAPI.md#RequestBalance) | **Post** /request/balance | Balance
+[**RequestHistorySearch**](InformationAPI.md#RequestHistorySearch) | **Post** /request/history_search | History search
 [**RequestSuccessRate**](InformationAPI.md#RequestSuccessRate) | **Post** /request/success_rate | Retrieve country success rates per service
 [**RequestSuggestedCountries**](InformationAPI.md#RequestSuggestedCountries) | **Post** /request/suggested_countries | Suggested Countries
 [**ServiceRetrieveAll**](InformationAPI.md#ServiceRetrieveAll) | **Get** /service/retrieve_all | Service list
@@ -267,6 +268,76 @@ Other parameters are passed through a pointer to a apiRequestBalanceRequest stru
 ### HTTP request headers
 
 - **Content-Type**: Not defined
+- **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
+## RequestHistorySearch
+
+> interface{} RequestHistorySearch(ctx).Search(search).Cursor(cursor).Limit(limit).Execute()
+
+History search
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/smspool/smspool-go"
+)
+
+func main() {
+	search := "search_example" // string | 
+	cursor := "cursor_example" // string |  (optional)
+	limit := int32(56) // int32 |  (optional)
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.InformationAPI.RequestHistorySearch(context.Background()).Search(search).Cursor(cursor).Limit(limit).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `InformationAPI.RequestHistorySearch``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `RequestHistorySearch`: interface{}
+	fmt.Fprintf(os.Stdout, "Response from `InformationAPI.RequestHistorySearch`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiRequestHistorySearchRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **search** | **string** |  | 
+ **cursor** | **string** |  | 
+ **limit** | **int32** |  | 
+
+### Return type
+
+**interface{}**
+
+### Authorization
+
+[bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+- **Content-Type**: application/x-www-form-urlencoded
 - **Accept**: application/json
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)

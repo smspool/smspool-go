@@ -90,6 +90,20 @@ Please note that the actual value of the `balance` field may vary depending on t
 	RequestBalanceExecute(r ApiRequestBalanceRequest) (interface{}, *http.Response, error)
 
 	/*
+	RequestHistorySearch History search
+
+	_Not documented yet: the parameters below come straight from the code._
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiRequestHistorySearchRequest
+	*/
+	RequestHistorySearch(ctx context.Context) ApiRequestHistorySearchRequest
+
+	// RequestHistorySearchExecute executes the request
+	//  @return interface{}
+	RequestHistorySearchExecute(r ApiRequestHistorySearchRequest) (interface{}, *http.Response, error)
+
+	/*
 	RequestSuccessRate Retrieve country success rates per service
 
 	This API endpoint is used to retrieve success per country for SMSPool requests. It sends an HTTP POST request to the URL `https://api.smspool.net/request/success_rate`.
@@ -602,6 +616,154 @@ func (a *InformationAPIService) RequestBalanceExecute(r ApiRequestBalanceRequest
 					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
 					newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v interface{}
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v interface{}
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiRequestHistorySearchRequest struct {
+	ctx context.Context
+	ApiService InformationAPI
+	search *string
+	cursor *string
+	limit *int32
+}
+
+func (r ApiRequestHistorySearchRequest) Search(search string) ApiRequestHistorySearchRequest {
+	r.search = &search
+	return r
+}
+
+func (r ApiRequestHistorySearchRequest) Cursor(cursor string) ApiRequestHistorySearchRequest {
+	r.cursor = &cursor
+	return r
+}
+
+func (r ApiRequestHistorySearchRequest) Limit(limit int32) ApiRequestHistorySearchRequest {
+	r.limit = &limit
+	return r
+}
+
+func (r ApiRequestHistorySearchRequest) Execute() (interface{}, *http.Response, error) {
+	return r.ApiService.RequestHistorySearchExecute(r)
+}
+
+/*
+RequestHistorySearch History search
+
+_Not documented yet: the parameters below come straight from the code._
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @return ApiRequestHistorySearchRequest
+*/
+func (a *InformationAPIService) RequestHistorySearch(ctx context.Context) ApiRequestHistorySearchRequest {
+	return ApiRequestHistorySearchRequest{
+		ApiService: a,
+		ctx: ctx,
+	}
+}
+
+// Execute executes the request
+//  @return interface{}
+func (a *InformationAPIService) RequestHistorySearchExecute(r ApiRequestHistorySearchRequest) (interface{}, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodPost
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  interface{}
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "InformationAPIService.RequestHistorySearch")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/request/history_search"
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.search == nil {
+		return localVarReturnValue, nil, reportError("search is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/x-www-form-urlencoded"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	parameterAddToHeaderOrQuery(localVarFormParams, "search", r.search, "", "")
+	if r.cursor != nil {
+		parameterAddToHeaderOrQuery(localVarFormParams, "cursor", r.cursor, "", "")
+	}
+	if r.limit != nil {
+		parameterAddToHeaderOrQuery(localVarFormParams, "limit", r.limit, "", "")
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 401 {
 			var v interface{}

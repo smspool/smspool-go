@@ -11,6 +11,7 @@ Method | HTTP request | Description
 [**RequestHistory**](SMSAPI.md#RequestHistory) | **Post** /request/history | Order History
 [**SmsActivate**](SMSAPI.md#SmsActivate) | **Post** /sms/activate | Activate SMS
 [**SmsAllStock**](SMSAPI.md#SmsAllStock) | **Post** /sms/all_stock | One-time stock for all services
+[**SmsArchive**](SMSAPI.md#SmsArchive) | **Post** /sms/archive | Archive
 [**SmsCancel**](SMSAPI.md#SmsCancel) | **Post** /sms/cancel | Cancel SMS
 [**SmsCancelAll**](SMSAPI.md#SmsCancelAll) | **Post** /sms/cancel_all | Cancel All SMS
 [**SmsCheck**](SMSAPI.md#SmsCheck) | **Post** /sms/check | Check SMS
@@ -497,6 +498,72 @@ Name | Type | Description  | Notes
 ### Authorization
 
 No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: application/x-www-form-urlencoded
+- **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
+## SmsArchive
+
+> interface{} SmsArchive(ctx).Orderid(orderid).Execute()
+
+Archive
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/smspool/smspool-go"
+)
+
+func main() {
+	orderid := "orderid_example" // string | 
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.SMSAPI.SmsArchive(context.Background()).Orderid(orderid).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `SMSAPI.SmsArchive``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `SmsArchive`: interface{}
+	fmt.Fprintf(os.Stdout, "Response from `SMSAPI.SmsArchive`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiSmsArchiveRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **orderid** | **string** |  | 
+
+### Return type
+
+**interface{}**
+
+### Authorization
+
+[bearerAuth](../README.md#bearerAuth)
 
 ### HTTP request headers
 

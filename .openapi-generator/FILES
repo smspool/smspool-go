@@ -2,7 +2,6 @@
 api/openapi.yaml
 api_business.go
 api_carrier.go
-api_esims.go
 api_information.go
 api_preorders.go
 api_pricing.go
@@ -13,7 +12,6 @@ client.go
 configuration.go
 docs/BusinessAPI.md
 docs/CarrierAPI.md
-docs/ESIMsAPI.md
 docs/InformationAPI.md
 docs/PreordersAPI.md
 docs/PricingAPI.md
