@@ -19,14 +19,6 @@ tags:
 - name: Carrier
 - description: These endpoints can only be reached by business accounts.
   name: Business
-- description: "Introduction to the eSIM API usage. Here's a step-to-step process\
-    \ on how to streamline your eSIM purchases:\n\n1. Retrieve the country list from\
-    \ **View eSIM countries**\n    \n2. Retrieve the plans per country using the **countryCode**\n\
-    \    \n3. Create your first purchase using the **Purchase eSIM**\n    \n4. Retrieve\
-    \ the **transactionId** from **Purchase eSIM**\n    \n5. Use the **View eSIM profile**\
-    \ endpoint to retrieve the QR code, or the access URL in order to install the\
-    \ eSIM or view remaining data."
-  name: eSIMs
 - description: Please keep in mind that this endpoint is only accessible for users
     that have special permissions to generate and maintain vouchers.
   name: Voucher
@@ -92,6 +84,67 @@ paths:
           description: Error
       security: []
       summary: Retrieve country success rates per service
+      tags:
+      - Information
+  /request/auto_country:
+    post:
+      description: |-
+        Returns the country SMSPool would order from for this service when you do not want to choose one (the quick order's "Pick for me"). It sends an HTTP POST request to the URL `https://api.smspool.net/request/auto_country`.
+
+        Every country with stock is scored on its measured success rate (a country with no order history displays 100% but has nothing to back it up, so it is left out unless no measured country has stock), weighed down when little stock backs it, minus a little per dollar, plus a bonus when it matches the country your request's IP resolves to (a local number verifies more often). The IP country is only used for that comparison; it is neither stored nor returned. Ties go to more stock, then the lower price. With `pricing_option=1` the cheapest country within reach of the best score wins instead.
+
+        Send `auto_country=1` to `/purchase/sms` to order with the same choice in one call.
+      operationId: request_auto_country
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/request_auto_country_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              examples:
+                "200":
+                  summary: "200"
+                  value:
+                    country_id: 1
+                    name: United States
+                    short_name: US
+                    price: "0.80"
+                    low_price: "0.24"
+                    success_rate: 94
+                    stock: 1320
+                    matches_ip: true
+                    rate_measured: true
+                    score: 119.52
+                    reason: "local number, 94% success, 1320 in stock"
+                    success: 1
+                "200_-_no_country_has_stock":
+                  summary: 200 - no country has stock
+                  value:
+                    success: 0
+                    message: No country has stock for this service right now.
+              schema: {}
+          description: OK
+        "400":
+          content:
+            application/json:
+              examples:
+                "400":
+                  summary: "400"
+                  value:
+                    success: 0
+                    errors:
+                    - message: You are missing a required parameter for this request.
+                      param: service
+                      description: Service name or service ID which can be retrieved
+                        at the /service/retrieve_all endpoint
+              schema: {}
+          description: Error
+      security: []
+      summary: Pick the best country for a service
       tags:
       - Information
   /request/balance:
@@ -1178,7 +1231,7 @@ paths:
   /sms/missed:
     post:
       description: |-
-        Some messages arrive on a number from your one-time orders but cannot finish the order, such as Ticketmaster and Seated codes or Hark reward payouts. This returns those messages, the same ones the Missed SMS tool on the website shows. Only numbers from pool Foxtrot are covered.
+        Some messages arrive on a number from your one-time orders but cannot finish the order, such as Ticketmaster and Seated codes, Hark reward payouts or Neon Money Talks messages. This returns those messages, the same ones the Missed SMS tool on the website shows. Only numbers from pool Foxtrot are covered.
 
         The newest messages come first. `url`, `code` and `email` hold the first link, code and email address found in the message, or an empty string.
       operationId: sms_missed
@@ -1416,7 +1469,28 @@ paths:
             application/json:
               schema: {}
           description: JSON response
-      security: []
+        "401":
+          content:
+            application/json:
+              example:
+                success: 0
+                errors:
+                - message: Invalid API key
+                  param: key
+              schema: {}
+          description: Malformed API key
+        "403":
+          content:
+            application/json:
+              example:
+                success: 0
+                errors:
+                - message: Invalid API key
+                  param: key
+              schema: {}
+          description: Unknown or revoked API key
+      security:
+      - bearerAuth: []
       summary: Request available areacodes
       tags:
       - SMS
@@ -2573,7 +2647,28 @@ paths:
                     count: 258
               schema: {}
           description: OK
-      security: []
+        "401":
+          content:
+            application/json:
+              example:
+                success: 0
+                errors:
+                - message: Invalid API key
+                  param: key
+              schema: {}
+          description: Malformed API key
+        "403":
+          content:
+            application/json:
+              example:
+                success: 0
+                errors:
+                - message: Invalid API key
+                  param: key
+              schema: {}
+          description: Unknown or revoked API key
+      security:
+      - bearerAuth: []
       summary: Retrieve Rental Stock
       tags:
       - Rental
@@ -3030,585 +3125,6 @@ paths:
       summary: Register user
       tags:
       - Business
-  /esim/purchase:
-    post:
-      operationId: esim_purchase
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: "#/components/schemas/esim_purchase_request"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              examples:
-                "200":
-                  summary: "200"
-                  value:
-                    success: 1
-                    message: Plan purchased successfully
-                    transactionId: ABCDEFGHI123456
-              schema: {}
-          description: OK
-        "401":
-          content:
-            application/json:
-              example:
-                success: 0
-                errors:
-                - message: Invalid API key
-                  param: key
-              schema: {}
-          description: Malformed API key
-        "403":
-          content:
-            application/json:
-              example:
-                success: 0
-                errors:
-                - message: Invalid API key
-                  param: key
-              schema: {}
-          description: Unknown or revoked API key
-      security:
-      - bearerAuth: []
-      summary: Purchase eSIM
-      tags:
-      - eSIMs
-  /esim/pricing:
-    post:
-      operationId: esim_pricing
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: "#/components/schemas/esim_pricing_request"
-        required: false
-      responses:
-        "200":
-          content:
-            application/json:
-              examples:
-                "200":
-                  summary: "200"
-                  value:
-                    data:
-                    - ID: 18
-                      speed: 3G/4G/5G
-                      network: "[{\"country\":\"United Arab Emirates\",\"network\"\
-                        :[{\"operatorName\":\"Etisalat\",\"networkType\":\"5G\"}]}]"
-                      countryCode: AE
-                      price: "0.40"
-                      dataInGb: 0.1
-                      extendable: 2
-                      name: United Arab Emirates
-                    - ID: 731
-                      speed: 3G/4G
-                      network: "[{\"country\":\"Botswana\",\"network\":[{\"operatorName\"\
-                        :\"Orange\",\"networkType\":\"5G\"},{\"operatorName\":\"Mascom\"\
-                        ,\"networkType\":\"5G\"}]},{\"country\":\"Burkina Faso\",\"\
-                        network\":[{\"operatorName\":\"Orange\",\"networkType\":\"\
-                        5G\"}]},{\"country\":\"Central African Republic\",\"network\"\
-                        :[{\"operatorName\":\"Orange\",\"networkType\":\"5G\"}]},{\"\
-                        country\":\"Chad\",\"network\":[{\"operatorName\":\"Airtel\"\
-                        ,\"networkType\":\"5G\"}]},{\"country\":\"Cote d'Ivoire\"\
-                        ,\"network\":[{\"operatorName\":\"Orange\",\"networkType\"\
-                        :\"5G\"}]},{\"country\":\"Democratic Republic of the Congo\"\
-                        ,\"network\":[{\"operatorName\":\"Airtel\",\"networkType\"\
-                        :\"5G\"},{\"operatorName\":\"Orange RDC\",\"networkType\"\
-                        :\"5G\"}]},{\"country\":\"Egypt\",\"network\":[{\"operatorName\"\
-                        :\"Orange\",\"networkType\":\"5G\"}]},{\"country\":\"Eswatini\"\
-                        ,\"network\":[{\"operatorName\":\"Swazi Mobile\",\"networkType\"\
-                        :\"5G\"},{\"operatorName\":\"Swazi MTN\",\"networkType\":\"\
-                        5G\"}]},{\"country\":\"Gabon\",\"network\":[{\"operatorName\"\
-                        :\"Airtel\",\"networkType\":\"5G\"}]},{\"country\":\"Ghana\"\
-                        ,\"network\":[{\"operatorName\":\"Vodafone\",\"networkType\"\
-                        :\"5G\"},{\"operatorName\":\"AirtelTigo\",\"networkType\"\
-                        :\"5G\"},{\"operatorName\":\"MTN\",\"networkType\":\"5G\"\
-                        }]},{\"country\":\"Guinea-Bissau\",\"network\":[{\"operatorName\"\
-                        :\"MTN Areeba\",\"networkType\":\"3G\"}]},{\"country\":\"\
-                        Kenya\",\"network\":[{\"operatorName\":\"Airtel\",\"networkType\"\
-                        :\"5G\"}]},{\"country\":\"Liberia\",\"network\":[{\"operatorName\"\
-                        :\"Lonestar Cell MTN\",\"networkType\":\"5G\"},{\"operatorName\"\
-                        :\"Orange\",\"networkType\":\"5G\"}]},{\"country\":\"Madagascar\"\
-                        ,\"network\":[{\"operatorName\":\"Airtel\",\"networkType\"\
-                        :\"5G\"}]},{\"country\":\"Malawi\",\"network\":[{\"operatorName\"\
-                        :\"Airtel\",\"networkType\":\"5G\"}]},{\"country\":\"Mali\"\
-                        ,\"network\":[{\"operatorName\":\"Orange\",\"networkType\"\
-                        :\"5G\"}]},{\"country\":\"Morocco\",\"network\":[{\"operatorName\"\
-                        :\"IAM\",\"networkType\":\"4G\"},{\"operatorName\":\"INWI\"\
-                        ,\"networkType\":\"4G\"},{\"operatorName\":\"Orange Morocco\"\
-                        ,\"networkType\":\"4G\"}]},{\"country\":\"Niger\",\"network\"\
-                        :[{\"operatorName\":\"Orange\",\"networkType\":\"3G\"},{\"\
-                        operatorName\":\"Airtel\",\"networkType\":\"3G\"}]},{\"country\"\
-                        :\"Nigeria\",\"network\":[{\"operatorName\":\"MTN\",\"networkType\"\
-                        :\"5G\"},{\"operatorName\":\"Airtel\",\"networkType\":\"5G\"\
-                        }]},{\"country\":\"Republic of the Congo\",\"network\":[{\"\
-                        operatorName\":\"Airtel\",\"networkType\":\"4G\"}]},{\"country\"\
-                        :\"Reunion\",\"network\":[{\"operatorName\":\"Orange\",\"\
-                        networkType\":\"5G\"}]},{\"country\":\"Senegal\",\"network\"\
-                        :[{\"operatorName\":\"Orange\",\"networkType\":\"4G\"}]},{\"\
-                        country\":\"Seychelles\",\"network\":[{\"operatorName\":\"\
-                        Airtel\",\"networkType\":\"5G\"}]},{\"country\":\"South Africa\"\
-                        ,\"network\":[{\"operatorName\":\"MTN\",\"networkType\":\"\
-                        5G\"},{\"operatorName\":\"Vodacom\",\"networkType\":\"4G\"\
-                        }]},{\"country\":\"Sudan\",\"network\":[{\"operatorName\"\
-                        :\"MTN\",\"networkType\":\"4G\"}]},{\"country\":\"Tanzania\"\
-                        ,\"network\":[{\"operatorName\":\"Airtel\",\"networkType\"\
-                        :\"4G\"}]},{\"country\":\"Tunisia\",\"network\":[{\"operatorName\"\
-                        :\"Orange\",\"networkType\":\"4G\"},{\"operatorName\":\"OOREDOO\
-                        \ TN\",\"networkType\":\"4G\"}]},{\"country\":\"Uganda\",\"\
-                        network\":[{\"operatorName\":\"Airtel\",\"networkType\":\"\
-                        5G\"},{\"operatorName\":\"MTN\",\"networkType\":\"5G\"}]},{\"\
-                        country\":\"Zambia\",\"network\":[{\"operatorName\":\"Airtel\"\
-                        ,\"networkType\":\"5G\"},{\"operatorName\":\"MTN\",\"networkType\"\
-                        :\"5G\"}]}]"
-                      countryCode: AF
-                      price: "3.60"
-                      dataInGb: 0.5
-                      extendable: 2
-                      name: Afghanistan
-                    - ID: 418
-                      speed: 3G/4G
-                      network: "[{\"country\":\"Albania\",\"network\":[{\"operatorName\"\
-                        :\"Vodafone\",\"networkType\":\"4G\"}]}]"
-                      countryCode: AL
-                      price: "0.40"
-                      dataInGb: 0.1
-                      extendable: 2
-                      name: Albania
-                    rows: 126
-              schema: {}
-          description: OK
-        "401":
-          content:
-            application/json:
-              example:
-                success: 0
-                errors:
-                - message: Invalid API key
-                  param: key
-              schema: {}
-          description: Malformed API key
-        "403":
-          content:
-            application/json:
-              example:
-                success: 0
-                errors:
-                - message: Invalid API key
-                  param: key
-              schema: {}
-          description: Unknown or revoked API key
-      security:
-      - bearerAuth: []
-      summary: View eSIM countries
-      tags:
-      - eSIMs
-  /esim/history:
-    post:
-      operationId: esim_history
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: "#/components/schemas/esim_history_request"
-        required: false
-      responses:
-        "200":
-          content:
-            application/json:
-              examples:
-                "200":
-                  summary: "200"
-                  value:
-                    data:
-                    - transactionId: ABCDEFGHI123456
-                      countryCode: us
-                      cost: "0.10"
-                      plan: 1
-                      name: United States
-                      timestamp: 2025-07-21
-                      expiration: 2025-10-05
-                      dataInGb: 50
-                      status: 2
-                      label: Labels
-                    rows: 1
-                    page: 1
-                    limit: 20
-              schema: {}
-          description: OK
-        "401":
-          content:
-            application/json:
-              example:
-                success: 0
-                errors:
-                - message: Invalid API key
-                  param: key
-              schema: {}
-          description: Malformed API key
-        "403":
-          content:
-            application/json:
-              example:
-                success: 0
-                errors:
-                - message: Invalid API key
-                  param: key
-              schema: {}
-          description: Unknown or revoked API key
-      security:
-      - bearerAuth: []
-      summary: View eSIM history
-      tags:
-      - eSIMs
-  /esim/label/update:
-    post:
-      description: |-
-        Set or clear the label of one of your eSIMs. The label is returned as `label` by **View eSIM history**, so you can use it to tell your eSIMs apart.
-
-        A label can be up to 30 characters long and may only contain letters, numbers and spaces. Leave `label` out, or send it empty, to remove the label.
-      operationId: esim_label_update
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: "#/components/schemas/esim_label_update_request"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              examples:
-                "200_-_label_updated":
-                  summary: 200 - label updated
-                  value:
-                    success: 1
-                    message: Label updated successfully
-                "200_-_invalid_label":
-                  summary: 200 - invalid label
-                  value:
-                    success: 0
-                    message: Label must be alphanumeric
-                "200_-_eSIM_not_found":
-                  summary: 200 - eSIM not found
-                  value:
-                    success: 0
-                    message: Transaction ID not found
-              schema: {}
-          description: OK
-        "401":
-          content:
-            application/json:
-              example:
-                success: 0
-                errors:
-                - message: Invalid API key
-                  param: key
-              schema: {}
-          description: Malformed API key
-        "403":
-          content:
-            application/json:
-              example:
-                success: 0
-                errors:
-                - message: Invalid API key
-                  param: key
-              schema: {}
-          description: Unknown or revoked API key
-      security:
-      - bearerAuth: []
-      summary: Update eSIM label
-      tags:
-      - eSIMs
-  /esim/plans:
-    post:
-      operationId: esim_plans
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: "#/components/schemas/esim_plans_request"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              examples:
-                "200":
-                  summary: "200"
-                  value:
-                  - ID: 975
-                    extendable: 2
-                    dataInGb: 0.1
-                    network: "[{\"country\":\"United States\",\"network\":[{\"operatorName\"\
-                      :\"T-Mobile\",\"networkType\":\"5G\"},{\"operatorName\":\"Verizon\"\
-                      ,\"networkType\":\"5G\"}]}]"
-                    duration: 7
-                    price: "0.40"
-                    speed: 3G/4G/5G
-                    ip: HK
-                  - ID: 1495
-                    extendable: 2
-                    dataInGb: 0.5
-                    network: "[{\"country\":\"United States\",\"network\":[{\"operatorName\"\
-                      :\"T-Mobile\",\"networkType\":\"5G\"},{\"operatorName\":\"Verizon\"\
-                      ,\"networkType\":\"5G\"}]}]"
-                    duration: 7
-                    price: "0.70"
-                    speed: 3G/4G/5G
-                    ip: HK
-                  - ID: 689
-                    extendable: 1
-                    dataInGb: 1
-                    network: "[{\"country\":\"United States\",\"network\":[{\"operatorName\"\
-                      :\"Verizon\",\"networkType\":\"5G\"},{\"operatorName\":\"AT&T\"\
-                      ,\"networkType\":\"5G\"}]}]"
-                    duration: 7
-                    price: "1.10"
-                    speed: 3G/4G/5G
-                    ip: PL
-              schema: {}
-          description: OK
-        "401":
-          content:
-            application/json:
-              example:
-                success: 0
-                errors:
-                - message: Invalid API key
-                  param: key
-              schema: {}
-          description: Malformed API key
-        "403":
-          content:
-            application/json:
-              example:
-                success: 0
-                errors:
-                - message: Invalid API key
-                  param: key
-              schema: {}
-          description: Unknown or revoked API key
-      security:
-      - bearerAuth: []
-      summary: View eSIM plans per country
-      tags:
-      - eSIMs
-  /esim/profile:
-    post:
-      operationId: esim_profile
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: "#/components/schemas/esim_profile_request"
-        required: false
-      responses:
-        "200":
-          content:
-            application/json:
-              examples:
-                "200":
-                  summary: "200"
-                  value:
-                    activated: 0
-                    ac: LPA:1$rsp-eu.simlessly.com$ABCDEFGHI123456
-                    success: 1
-                    pin: "2811"
-                    topup: 2
-                    apn: plus
-                    puk: "08992817"
-                    smdp: rsp-eu.simlessly.com
-                    activationCode: ABCDEFGHI123456
-                    countryCode: AM
-                    transactionId: ABCDEFGHI123456
-                    plan: 17
-                    label: null
-                    remainingData: 3 GB
-                    totalData: 3 GB
-              schema: {}
-          description: OK
-        "401":
-          content:
-            application/json:
-              example:
-                success: 0
-                errors:
-                - message: Invalid API key
-                  param: key
-              schema: {}
-          description: Malformed API key
-        "403":
-          content:
-            application/json:
-              example:
-                success: 0
-                errors:
-                - message: Invalid API key
-                  param: key
-              schema: {}
-          description: Unknown or revoked API key
-      security:
-      - bearerAuth: []
-      summary: View eSIM profile
-      tags:
-      - eSIMs
-  /esim/delete:
-    post:
-      operationId: esim_delete
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: "#/components/schemas/esim_delete_request"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              examples:
-                "200":
-                  summary: "200"
-                  value:
-                    success: 1
-                    message: eSIM archived successfully
-              schema: {}
-          description: OK
-        "401":
-          content:
-            application/json:
-              example:
-                success: 0
-                errors:
-                - message: Invalid API key
-                  param: key
-              schema: {}
-          description: Malformed API key
-        "403":
-          content:
-            application/json:
-              example:
-                success: 0
-                errors:
-                - message: Invalid API key
-                  param: key
-              schema: {}
-          description: Unknown or revoked API key
-      security:
-      - bearerAuth: []
-      summary: Delete eSIM
-      tags:
-      - eSIMs
-  /esim/topup:
-    post:
-      operationId: esim_topup
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: "#/components/schemas/esim_topup_request"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              examples:
-                Top_up_eSIM:
-                  summary: Top up eSIM
-                  value:
-                    success: 1
-                    message: eSIM topped up successfully
-              schema: {}
-          description: OK
-        "401":
-          content:
-            application/json:
-              example:
-                success: 0
-                errors:
-                - message: Invalid API key
-                  param: key
-              schema: {}
-          description: Malformed API key
-        "403":
-          content:
-            application/json:
-              example:
-                success: 0
-                errors:
-                - message: Invalid API key
-                  param: key
-              schema: {}
-          description: Unknown or revoked API key
-      security:
-      - bearerAuth: []
-      summary: Top up eSIM
-      tags:
-      - eSIMs
-  /esim/topup_plans:
-    post:
-      operationId: esim_topup_plans
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: "#/components/schemas/esim_topup_plans_request"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              examples:
-                "200":
-                  summary: "200"
-                  value:
-                  - ID: 1
-                    extendable: 2
-                    dataInGb: 3
-                    network: "[{\"country\":\"Spain\",\"network\":[{\"operatorName\"\
-                      :\"Vodafone\",\"networkType\":\"5G\"},{\"operatorName\":\"Orange\"\
-                      ,\"networkType\":\"5G\"},{\"operatorName\":\"Movistar\",\"networkType\"\
-                      :\"5G\"},{\"operatorName\":\"Yoigo\",\"networkType\":\"5G\"\
-                      }]}]"
-                    duration: 30
-                    price: "2.50"
-                    speed: 3G/4G/5G
-                    ip: UK/NO
-                  - ID: 2
-                    extendable: 2
-                    dataInGb: 5
-                    network: "[{\"country\":\"Spain\",\"network\":[{\"operatorName\"\
-                      :\"Vodafone\",\"networkType\":\"5G\"},{\"operatorName\":\"Orange\"\
-                      ,\"networkType\":\"5G\"},{\"operatorName\":\"Movistar\",\"networkType\"\
-                      :\"5G\"},{\"operatorName\":\"Yoigo\",\"networkType\":\"5G\"\
-                      }]}]"
-                    duration: 30
-                    price: "3.80"
-                    speed: 3G/4G/5G
-                    ip: UK/NO
-                  - ID: 191
-                    extendable: 2
-                    dataInGb: 1
-                    network: "[{\"country\":\"Spain\",\"network\":[{\"operatorName\"\
-                      :\"Vodafone\",\"networkType\":\"5G\"},{\"operatorName\":\"Orange\"\
-                      ,\"networkType\":\"5G\"},{\"operatorName\":\"Movistar\",\"networkType\"\
-                      :\"5G\"},{\"operatorName\":\"Yoigo\",\"networkType\":\"5G\"\
-                      }]}]"
-                    duration: 7
-                    price: "1.00"
-                    speed: 3G/4G/5G
-                    ip: UK/NO
-              schema: {}
-          description: OK
-      security: []
-      summary: Top Up Plans
-      tags:
-      - eSIMs
   /voucher/generate:
     post:
       operationId: voucher_generate
@@ -3763,6 +3279,92 @@ paths:
       summary: Bulk generate vouchers
       tags:
       - Voucher
+  /request/history_search:
+    post:
+      description: "_Not documented yet: the parameters below come straight from the\
+        \ code._"
+      operationId: request_history_search
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/request_history_search_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: JSON response
+        "401":
+          content:
+            application/json:
+              example:
+                success: 0
+                errors:
+                - message: Invalid API key
+                  param: key
+              schema: {}
+          description: Malformed API key
+        "403":
+          content:
+            application/json:
+              example:
+                success: 0
+                errors:
+                - message: Invalid API key
+                  param: key
+              schema: {}
+          description: Unknown or revoked API key
+      security:
+      - bearerAuth: []
+      summary: History search
+      tags:
+      - Information
+      x-undocumented: true
+  /sms/archive:
+    post:
+      description: "_Not documented yet: the parameters below come straight from the\
+        \ code._"
+      operationId: sms_archive
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/sms_archive_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: JSON response
+        "401":
+          content:
+            application/json:
+              example:
+                success: 0
+                errors:
+                - message: Invalid API key
+                  param: key
+              schema: {}
+          description: Malformed API key
+        "403":
+          content:
+            application/json:
+              example:
+                success: 0
+                errors:
+                - message: Invalid API key
+                  param: key
+              schema: {}
+          description: Unknown or revoked API key
+      security:
+      - bearerAuth: []
+      summary: Archive
+      tags:
+      - SMS
+      x-undocumented: true
 components:
   schemas:
     request_pricing_request:
@@ -3803,20 +3405,6 @@ components:
           type: integer
         ban:
           type: integer
-      type: object
-    esim_label_update_request:
-      properties:
-        transactionId:
-          description: transactionId retrieved from /esim/purchase
-          example: ABCDEFGHI123456
-          type: string
-        label:
-          description: "The new label: letters, numbers and spaces, at most 30 characters.\
-            \ Empty or left out removes the label."
-          example: Travel phone
-          type: string
-      required:
-      - transactionId
       type: object
     rental_retrieve_all_request:
       properties:
@@ -3959,18 +3547,6 @@ components:
       - days
       - rental_code
       type: object
-    esim_pricing_request:
-      properties:
-        start:
-          description: Start page
-          type: integer
-        length:
-          description: Amount of rows per page
-          type: integer
-        search:
-          description: Search query for country
-          type: string
-      type: object
     voucher_delete_request:
       properties:
         voucher:
@@ -3979,27 +3555,6 @@ components:
           type: string
       required:
       - voucher
-      type: object
-    esim_history_request:
-      properties:
-        start:
-          description: Start page
-          type: integer
-        length:
-          description: Amount of rows per page
-          type: integer
-        search:
-          description: Alphanumeric search
-          type: string
-      type: object
-    esim_plans_request:
-      properties:
-        country:
-          description: ISO 3166 country code
-          example: US
-          type: string
-      required:
-      - country
       type: object
     voucher_bulk_generate_request:
       properties:
@@ -4028,24 +3583,6 @@ components:
       required:
       - password
       - username
-      type: object
-    esim_delete_request:
-      properties:
-        transactionId:
-          description: transactionId retrieved from /esim/purchase
-          example: transactionId
-          type: string
-      required:
-      - transactionId
-      type: object
-    esim_purchase_request:
-      properties:
-        plan:
-          description: The plan ID which is obtained from /esim/pricing
-          example: 1
-          type: integer
-      required:
-      - plan
       type: object
     sms_all_stock_request:
       properties:
@@ -4139,12 +3676,31 @@ components:
       - country
       - service
       type: object
-    esim_profile_request:
+    request_history_search_request:
       properties:
-        transactionId:
-          description: transactionId retrieved from /esim/purchase
-          example: transactionId
+        search:
           type: string
+        cursor:
+          type: string
+        limit:
+          type: integer
+      required:
+      - search
+      type: object
+    request_auto_country_request:
+      properties:
+        service:
+          description: Service name or service ID which can be retrieved at the /service/retrieve_all
+            endpoint
+          example: "1"
+          type: string
+        pricing_option:
+          description: Set to 1 to prefer the cheapest country among those close to
+            the best score; 0 (default) picks purely on the score.
+          example: 0
+          type: integer
+      required:
+      - service
       type: object
     voucher_generate_request:
       properties:
@@ -4183,20 +3739,6 @@ components:
           type: string
       required:
       - orderid
-      type: object
-    esim_topup_request:
-      properties:
-        transactionId:
-          description: Transaction ID retrieved from eSIM history
-          example: ABCDEFGHI123456
-          type: string
-        plan:
-          description: Topup plan retrieved from "Top Up Plans"
-          example: 1
-          type: integer
-      required:
-      - plan
-      - transactionId
       type: object
     rental_service_price_request:
       properties:
@@ -4279,6 +3821,13 @@ components:
       required:
       - rental_code
       type: object
+    sms_archive_request:
+      properties:
+        orderid:
+          type: string
+      required:
+      - orderid
+      type: object
     request_price_request:
       properties:
         country:
@@ -4306,15 +3855,6 @@ components:
           type: integer
       required:
       - phonenumber
-      type: object
-    esim_topup_plans_request:
-      properties:
-        plan:
-          description: '`plan` retrieved from eSIM history'
-          example: 1
-          type: integer
-      required:
-      - plan
       type: object
     purchase_sms_request:
       properties:
@@ -4368,6 +3908,17 @@ components:
           type: integer
         phonenumber:
           description: In case you want to select a specific phone number to order
+          type: integer
+        auto_country:
+          description: "Set to 1 to let SMSPool pick the country: every country with\
+            \ stock is scored on its measured success rate (weighed down when little\
+            \ stock backs it, minus a little per dollar; countries with no order history\
+            \ are left out unless nothing else has stock) with a bonus for a local\
+            \ number, the country your request's IP resolves to; with pricing_option=1\
+            \ the cheapest country close to the best score wins. Ignored when country\
+            \ is sent. The response then carries auto_country with the chosen country\
+            \ and the reason."
+          example: 0
           type: integer
         software:
           type: integer
