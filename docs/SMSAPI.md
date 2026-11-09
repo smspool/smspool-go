@@ -11,6 +11,7 @@ Method | HTTP request | Description
 [**RequestHistory**](SMSAPI.md#RequestHistory) | **Post** /request/history | Order History
 [**SmsActivate**](SMSAPI.md#SmsActivate) | **Post** /sms/activate | Activate SMS
 [**SmsAllStock**](SMSAPI.md#SmsAllStock) | **Post** /sms/all_stock | One-time stock for all services
+[**SmsArchive**](SMSAPI.md#SmsArchive) | **Post** /sms/archive | Archive
 [**SmsCancel**](SMSAPI.md#SmsCancel) | **Post** /sms/cancel | Cancel SMS
 [**SmsCancelAll**](SMSAPI.md#SmsCancelAll) | **Post** /sms/cancel_all | Cancel All SMS
 [**SmsCheck**](SMSAPI.md#SmsCheck) | **Post** /sms/check | Check SMS
@@ -26,7 +27,7 @@ Method | HTTP request | Description
 
 ## PurchaseSms
 
-> interface{} PurchaseSms(ctx).Service(service).Country(country).Pool(pool).MaxPrice(maxPrice).PricingOption(pricingOption).Quantity(quantity).Areacode(areacode).Exclude(exclude).CreateToken(createToken).ActivationType(activationType).Carrier(carrier).Phonenumber(phonenumber).Software(software).Execute()
+> interface{} PurchaseSms(ctx).Service(service).Country(country).Pool(pool).MaxPrice(maxPrice).PricingOption(pricingOption).Quantity(quantity).Areacode(areacode).Exclude(exclude).CreateToken(createToken).ActivationType(activationType).Carrier(carrier).Phonenumber(phonenumber).AutoCountry(autoCountry).Software(software).Execute()
 
 Order SMS
 
@@ -55,11 +56,12 @@ func main() {
 	activationType := "activationType_example" // string | Options: SMS, VOICE, FLASH. SMS will receive regular SMS, VOICE will receive phone calls that mentions the SMS and FLASH is for FLASH calls for verification. (optional)
 	carrier := int32(56) // int32 | Options: 1 or 2. Pick a carrier (only works for pool Foxtrot US) (optional)
 	phonenumber := int32(56) // int32 | In case you want to select a specific phone number to order (optional)
+	autoCountry := int32(56) // int32 | Set to 1 to let SMSPool pick the country: every country with stock is scored on its measured success rate (weighed down when little stock backs it, minus a little per dollar; countries with no order history are left out unless nothing else has stock) with a bonus for a local number, the country your request's IP resolves to; with pricing_option=1 the cheapest country close to the best score wins. Ignored when country is sent. The response then carries auto_country with the chosen country and the reason. (optional)
 	software := int32(56) // int32 |  (optional)
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
-	resp, r, err := apiClient.SMSAPI.PurchaseSms(context.Background()).Service(service).Country(country).Pool(pool).MaxPrice(maxPrice).PricingOption(pricingOption).Quantity(quantity).Areacode(areacode).Exclude(exclude).CreateToken(createToken).ActivationType(activationType).Carrier(carrier).Phonenumber(phonenumber).Software(software).Execute()
+	resp, r, err := apiClient.SMSAPI.PurchaseSms(context.Background()).Service(service).Country(country).Pool(pool).MaxPrice(maxPrice).PricingOption(pricingOption).Quantity(quantity).Areacode(areacode).Exclude(exclude).CreateToken(createToken).ActivationType(activationType).Carrier(carrier).Phonenumber(phonenumber).AutoCountry(autoCountry).Software(software).Execute()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error when calling `SMSAPI.PurchaseSms``: %v\n", err)
 		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
@@ -92,6 +94,7 @@ Name | Type | Description  | Notes
  **activationType** | **string** | Options: SMS, VOICE, FLASH. SMS will receive regular SMS, VOICE will receive phone calls that mentions the SMS and FLASH is for FLASH calls for verification. | 
  **carrier** | **int32** | Options: 1 or 2. Pick a carrier (only works for pool Foxtrot US) | 
  **phonenumber** | **int32** | In case you want to select a specific phone number to order | 
+ **autoCountry** | **int32** | Set to 1 to let SMSPool pick the country: every country with stock is scored on its measured success rate (weighed down when little stock backs it, minus a little per dollar; countries with no order history are left out unless nothing else has stock) with a bonus for a local number, the country your request&#39;s IP resolves to; with pricing_option&#x3D;1 the cheapest country close to the best score wins. Ignored when country is sent. The response then carries auto_country with the chosen country and the reason. | 
  **software** | **int32** |  | 
 
 ### Return type
@@ -290,7 +293,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[bearerAuth](../README.md#bearerAuth)
 
 ### HTTP request headers
 
@@ -497,6 +500,72 @@ Name | Type | Description  | Notes
 ### Authorization
 
 No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: application/x-www-form-urlencoded
+- **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
+## SmsArchive
+
+> interface{} SmsArchive(ctx).Orderid(orderid).Execute()
+
+Archive
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/smspool/smspool-go"
+)
+
+func main() {
+	orderid := "orderid_example" // string | 
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.SMSAPI.SmsArchive(context.Background()).Orderid(orderid).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `SMSAPI.SmsArchive``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `SmsArchive`: interface{}
+	fmt.Fprintf(os.Stdout, "Response from `SMSAPI.SmsArchive`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiSmsArchiveRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **orderid** | **string** |  | 
+
+### Return type
+
+**interface{}**
+
+### Authorization
+
+[bearerAuth](../README.md#bearerAuth)
 
 ### HTTP request headers
 

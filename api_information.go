@@ -66,6 +66,24 @@ Please use either the service ID, or the service name as service param.
 	PoolRetrieveValidExecute(r ApiPoolRetrieveValidRequest) (interface{}, *http.Response, error)
 
 	/*
+	RequestAutoCountry Pick the best country for a service
+
+	Returns the country SMSPool would order from for this service when you do not want to choose one (the quick order's "Pick for me"). It sends an HTTP POST request to the URL `https://api.smspool.net/request/auto_country`.
+
+Every country with stock is scored on its measured success rate (a country with no order history displays 100% but has nothing to back it up, so it is left out unless no measured country has stock), weighed down when little stock backs it, minus a little per dollar, plus a bonus when it matches the country your request's IP resolves to (a local number verifies more often). The IP country is only used for that comparison; it is neither stored nor returned. Ties go to more stock, then the lower price. With `pricing_option=1` the cheapest country within reach of the best score wins instead.
+
+Send `auto_country=1` to `/purchase/sms` to order with the same choice in one call.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiRequestAutoCountryRequest
+	*/
+	RequestAutoCountry(ctx context.Context) ApiRequestAutoCountryRequest
+
+	// RequestAutoCountryExecute executes the request
+	//  @return interface{}
+	RequestAutoCountryExecute(r ApiRequestAutoCountryRequest) (interface{}, *http.Response, error)
+
+	/*
 	RequestBalance Balance
 
 	This HTTP POST request is used to retrieve the balance for a specific SMSPool. The request is sent to the URL `https://api.smspool.net/request/balance`.
@@ -88,6 +106,20 @@ Please note that the actual value of the `balance` field may vary depending on t
 	// RequestBalanceExecute executes the request
 	//  @return interface{}
 	RequestBalanceExecute(r ApiRequestBalanceRequest) (interface{}, *http.Response, error)
+
+	/*
+	RequestHistorySearch History search
+
+	_Not documented yet: the parameters below come straight from the code._
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiRequestHistorySearchRequest
+	*/
+	RequestHistorySearch(ctx context.Context) ApiRequestHistorySearchRequest
+
+	// RequestHistorySearchExecute executes the request
+	//  @return interface{}
+	RequestHistorySearchExecute(r ApiRequestHistorySearchRequest) (interface{}, *http.Response, error)
 
 	/*
 	RequestSuccessRate Retrieve country success rates per service
@@ -498,6 +530,140 @@ func (a *InformationAPIService) PoolRetrieveValidExecute(r ApiPoolRetrieveValidR
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
+type ApiRequestAutoCountryRequest struct {
+	ctx context.Context
+	ApiService InformationAPI
+	service *string
+	pricingOption *int32
+}
+
+// Service name or service ID which can be retrieved at the /service/retrieve_all endpoint
+func (r ApiRequestAutoCountryRequest) Service(service string) ApiRequestAutoCountryRequest {
+	r.service = &service
+	return r
+}
+
+// Set to 1 to prefer the cheapest country among those close to the best score; 0 (default) picks purely on the score.
+func (r ApiRequestAutoCountryRequest) PricingOption(pricingOption int32) ApiRequestAutoCountryRequest {
+	r.pricingOption = &pricingOption
+	return r
+}
+
+func (r ApiRequestAutoCountryRequest) Execute() (interface{}, *http.Response, error) {
+	return r.ApiService.RequestAutoCountryExecute(r)
+}
+
+/*
+RequestAutoCountry Pick the best country for a service
+
+Returns the country SMSPool would order from for this service when you do not want to choose one (the quick order's "Pick for me"). It sends an HTTP POST request to the URL `https://api.smspool.net/request/auto_country`.
+
+Every country with stock is scored on its measured success rate (a country with no order history displays 100% but has nothing to back it up, so it is left out unless no measured country has stock), weighed down when little stock backs it, minus a little per dollar, plus a bonus when it matches the country your request's IP resolves to (a local number verifies more often). The IP country is only used for that comparison; it is neither stored nor returned. Ties go to more stock, then the lower price. With `pricing_option=1` the cheapest country within reach of the best score wins instead.
+
+Send `auto_country=1` to `/purchase/sms` to order with the same choice in one call.
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @return ApiRequestAutoCountryRequest
+*/
+func (a *InformationAPIService) RequestAutoCountry(ctx context.Context) ApiRequestAutoCountryRequest {
+	return ApiRequestAutoCountryRequest{
+		ApiService: a,
+		ctx: ctx,
+	}
+}
+
+// Execute executes the request
+//  @return interface{}
+func (a *InformationAPIService) RequestAutoCountryExecute(r ApiRequestAutoCountryRequest) (interface{}, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodPost
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  interface{}
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "InformationAPIService.RequestAutoCountry")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/request/auto_country"
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.service == nil {
+		return localVarReturnValue, nil, reportError("service is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/x-www-form-urlencoded"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	parameterAddToHeaderOrQuery(localVarFormParams, "service", r.service, "", "")
+	if r.pricingOption != nil {
+		parameterAddToHeaderOrQuery(localVarFormParams, "pricing_option", r.pricingOption, "", "")
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v interface{}
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
 type ApiRequestBalanceRequest struct {
 	ctx context.Context
 	ApiService InformationAPI
@@ -602,6 +768,154 @@ func (a *InformationAPIService) RequestBalanceExecute(r ApiRequestBalanceRequest
 					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
 					newErr.model = v
 			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v interface{}
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v interface{}
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiRequestHistorySearchRequest struct {
+	ctx context.Context
+	ApiService InformationAPI
+	search *string
+	cursor *string
+	limit *int32
+}
+
+func (r ApiRequestHistorySearchRequest) Search(search string) ApiRequestHistorySearchRequest {
+	r.search = &search
+	return r
+}
+
+func (r ApiRequestHistorySearchRequest) Cursor(cursor string) ApiRequestHistorySearchRequest {
+	r.cursor = &cursor
+	return r
+}
+
+func (r ApiRequestHistorySearchRequest) Limit(limit int32) ApiRequestHistorySearchRequest {
+	r.limit = &limit
+	return r
+}
+
+func (r ApiRequestHistorySearchRequest) Execute() (interface{}, *http.Response, error) {
+	return r.ApiService.RequestHistorySearchExecute(r)
+}
+
+/*
+RequestHistorySearch History search
+
+_Not documented yet: the parameters below come straight from the code._
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @return ApiRequestHistorySearchRequest
+*/
+func (a *InformationAPIService) RequestHistorySearch(ctx context.Context) ApiRequestHistorySearchRequest {
+	return ApiRequestHistorySearchRequest{
+		ApiService: a,
+		ctx: ctx,
+	}
+}
+
+// Execute executes the request
+//  @return interface{}
+func (a *InformationAPIService) RequestHistorySearchExecute(r ApiRequestHistorySearchRequest) (interface{}, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodPost
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  interface{}
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "InformationAPIService.RequestHistorySearch")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/request/history_search"
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.search == nil {
+		return localVarReturnValue, nil, reportError("search is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/x-www-form-urlencoded"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	parameterAddToHeaderOrQuery(localVarFormParams, "search", r.search, "", "")
+	if r.cursor != nil {
+		parameterAddToHeaderOrQuery(localVarFormParams, "cursor", r.cursor, "", "")
+	}
+	if r.limit != nil {
+		parameterAddToHeaderOrQuery(localVarFormParams, "limit", r.limit, "", "")
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
 		}
 		if localVarHTTPResponse.StatusCode == 401 {
 			var v interface{}

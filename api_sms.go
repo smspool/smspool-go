@@ -170,6 +170,20 @@ Please note that the response may contain additional properties not mentioned he
 	SmsAllStockExecute(r ApiSmsAllStockRequest) (interface{}, *http.Response, error)
 
 	/*
+	SmsArchive Archive
+
+	_Not documented yet: the parameters below come straight from the code._
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiSmsArchiveRequest
+	*/
+	SmsArchive(ctx context.Context) ApiSmsArchiveRequest
+
+	// SmsArchiveExecute executes the request
+	//  @return interface{}
+	SmsArchiveExecute(r ApiSmsArchiveRequest) (interface{}, *http.Response, error)
+
+	/*
 	SmsCancel Cancel SMS
 
 	# Cancel your SMS order
@@ -257,7 +271,7 @@ Please note that the response may contain additional properties not mentioned he
 	/*
 	SmsMissed Missed SMS
 
-	Some messages arrive on a number from your one-time orders but cannot finish the order, such as Ticketmaster and Seated codes or Hark reward payouts. This returns those messages, the same ones the Missed SMS tool on the website shows. Only numbers from pool Foxtrot are covered.
+	Some messages arrive on a number from your one-time orders but cannot finish the order, such as Ticketmaster and Seated codes, Hark reward payouts or Neon Money Talks messages. This returns those messages, the same ones the Missed SMS tool on the website shows. Only numbers from pool Foxtrot are covered.
 
 The newest messages come first. `url`, `code` and `email` hold the first link, code and email address found in the message, or an empty string.
 
@@ -367,6 +381,7 @@ type ApiPurchaseSmsRequest struct {
 	activationType *string
 	carrier *int32
 	phonenumber *int32
+	autoCountry *int32
 	software *int32
 }
 
@@ -439,6 +454,12 @@ func (r ApiPurchaseSmsRequest) Carrier(carrier int32) ApiPurchaseSmsRequest {
 // In case you want to select a specific phone number to order
 func (r ApiPurchaseSmsRequest) Phonenumber(phonenumber int32) ApiPurchaseSmsRequest {
 	r.phonenumber = &phonenumber
+	return r
+}
+
+// Set to 1 to let SMSPool pick the country: every country with stock is scored on its measured success rate (weighed down when little stock backs it, minus a little per dollar; countries with no order history are left out unless nothing else has stock) with a bonus for a local number, the country your request&#39;s IP resolves to; with pricing_option&#x3D;1 the cheapest country close to the best score wins. Ignored when country is sent. The response then carries auto_country with the chosen country and the reason.
+func (r ApiPurchaseSmsRequest) AutoCountry(autoCountry int32) ApiPurchaseSmsRequest {
+	r.autoCountry = &autoCountry
 	return r
 }
 
@@ -538,6 +559,9 @@ func (a *SMSAPIService) PurchaseSmsExecute(r ApiPurchaseSmsRequest) (interface{}
 	}
 	if r.phonenumber != nil {
 		parameterAddToHeaderOrQuery(localVarFormParams, "phonenumber", r.phonenumber, "", "")
+	}
+	if r.autoCountry != nil {
+		parameterAddToHeaderOrQuery(localVarFormParams, "auto_country", r.autoCountry, "", "")
 	}
 	if r.software != nil {
 		parameterAddToHeaderOrQuery(localVarFormParams, "software", r.software, "", "")
@@ -979,6 +1003,27 @@ func (a *SMSAPIService) RequestAreacodesExecute(r ApiRequestAreacodesRequest) (i
 		newErr := &GenericOpenAPIError{
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v interface{}
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v interface{}
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		}
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
@@ -1450,6 +1495,136 @@ func (a *SMSAPIService) SmsAllStockExecute(r ApiSmsAllStockRequest) (interface{}
 		newErr := &GenericOpenAPIError{
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiSmsArchiveRequest struct {
+	ctx context.Context
+	ApiService SMSAPI
+	orderid *string
+}
+
+func (r ApiSmsArchiveRequest) Orderid(orderid string) ApiSmsArchiveRequest {
+	r.orderid = &orderid
+	return r
+}
+
+func (r ApiSmsArchiveRequest) Execute() (interface{}, *http.Response, error) {
+	return r.ApiService.SmsArchiveExecute(r)
+}
+
+/*
+SmsArchive Archive
+
+_Not documented yet: the parameters below come straight from the code._
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @return ApiSmsArchiveRequest
+*/
+func (a *SMSAPIService) SmsArchive(ctx context.Context) ApiSmsArchiveRequest {
+	return ApiSmsArchiveRequest{
+		ApiService: a,
+		ctx: ctx,
+	}
+}
+
+// Execute executes the request
+//  @return interface{}
+func (a *SMSAPIService) SmsArchiveExecute(r ApiSmsArchiveRequest) (interface{}, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodPost
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  interface{}
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SMSAPIService.SmsArchive")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/sms/archive"
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.orderid == nil {
+		return localVarReturnValue, nil, reportError("orderid is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/x-www-form-urlencoded"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	parameterAddToHeaderOrQuery(localVarFormParams, "orderid", r.orderid, "", "")
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v interface{}
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v interface{}
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		}
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
@@ -2207,7 +2382,7 @@ func (r ApiSmsMissedRequest) Execute() (interface{}, *http.Response, error) {
 /*
 SmsMissed Missed SMS
 
-Some messages arrive on a number from your one-time orders but cannot finish the order, such as Ticketmaster and Seated codes or Hark reward payouts. This returns those messages, the same ones the Missed SMS tool on the website shows. Only numbers from pool Foxtrot are covered.
+Some messages arrive on a number from your one-time orders but cannot finish the order, such as Ticketmaster and Seated codes, Hark reward payouts or Neon Money Talks messages. This returns those messages, the same ones the Missed SMS tool on the website shows. Only numbers from pool Foxtrot are covered.
 
 The newest messages come first. `url`, `code` and `email` hold the first link, code and email address found in the message, or an empty string.
 
