@@ -1,7 +1,7 @@
 /*
 SMSPool API
 
-Every endpoint accepts its parameters as form fields (POST) or query parameters (GET).  Authenticate with your API key from https://www.smspool.net/my/settings, either as a bearer token (`Authorization: Bearer <key>`) or as a `key` parameter.
+Every endpoint accepts its parameters as form fields (POST) or query parameters (GET). A JSON object body (`Content-Type: application/json`) works too: its top-level fields are read as parameters; a parameter that is also in the query string or form body wins.  Authenticate with your API key from https://www.smspool.net/my/settings as a bearer token: `Authorization: Bearer <key>`. A `key` field in a POST body works too. Keep the key out of the URL: a URL is saved in browser history and can be recorded by proxies and logs on the way to us.  Use of the API is subject to the [Terms of Service](https://www.smspool.net/tos#api). Article 11 covers API use: sanctions and geographic restrictions, what you must require of your own users if you resell the service, and the safekeeping of keys.  ## Errors  An error answers with `success: 0`, a human-readable `message` and, where the API can name the cause, a machine-readable `type`. Check `type`, not the text of `message`. Parameter and key errors also carry `errors`, one entry per problem (`message`, `param`, `type`); the top-level `message` and `type` repeat the API key's entry when there is one, otherwise the first.  | `type` | HTTP | Meaning | | --- | --- | --- | | `MISSING_PARAMETER` | 400 | A required parameter was not sent | | `INVALID_PARAMETER` | varies | A parameter has a value the endpoint cannot use | | `INVALID_POOL` | 400 | `/purchase/sms`: the `pool` name does not exist | | `INVALID_KEY` | 401 / 403 | The API key is malformed (401) or unknown or revoked (403) | | `API_KEY_SCOPE` | 403 | The API key is not allowed to call this endpoint, or not from this IP address | | `RATE_LIMITED` | 429 | Too many requests; wait for the `Retry-After` header's seconds | | `IDEMPOTENCY_IN_PROGRESS` | 409 | The first request with this `Idempotency-Key` has not finished |  Endpoints add their own types (for example `OUT_OF_STOCK`). Older errors may have no `type`.  ## Idempotent purchases  `/purchase/sms`, `/purchase/rental`, `/esim/purchase` and `/voucher/generate` accept an optional `Idempotency-Key` header (or an `idempotency_key` parameter): 1 to 128 printable ASCII characters that you choose, unique per purchase, for example a UUID. If a request times out, send it again with the same key:  - the first request runs normally; - a repeat within 24 hours answers with the first request's status and body and the header `Idempotent-Replay: true`, and buys nothing; - a repeat while the first is still running answers `409` with `type: IDEMPOTENCY_IN_PROGRESS`; retry shortly.  A request that bought nothing (`success: 0`) does not use up its key, so it can be retried with the same one. A key belongs to your account and the endpoint. Requests without a key behave as they always have.  ## Webhooks  Instead of polling `/sms/check`, set a webhook URL under Settings → Developer and receive each SMS as a signed JSON `POST`. The events are listed under Webhooks below; setup, retries and signature checks are described in [How to set up webhooks](https://www.smspool.net/article/how-to-setup-webhooks-for-smspool-ec19b80ade92).  ## Health check  `GET /up` needs no key and answers `200 {\"status\":\"ok\",...}` or `503 {\"status\":\"degraded\",...}`.
 
 API version: 1.0
 */
@@ -23,6 +23,30 @@ type SMSAPI interface {
 
 	/*
 	PurchaseSms Order SMS
+
+	Orders one or more numbers for a service.
+
+### Response shapes
+
+Without `response=v2` the shape depends on `quantity`: one number returns the order object; several return a JSON array of order objects; if ordering stops part-way, an object with the orders bought so far under `"0"`, `"1"`, ... plus `message`.
+
+With `response=v2` every case returns the same object:
+
+- `success`: 1 when every requested number was ordered, otherwise 0
+- `orders`: the orders that were placed (may be empty)
+- `failed`: the error that stopped the request, as a one-element list (empty on success)
+- `message`: a summary
+- `auto_country`: only with `auto_country=1`, the chosen country
+
+`response=v2` is ignored together with `create_token=1`.
+
+### Pool
+
+`pool` is a pool ID or name from the `Pool List` endpoint. A name that does not exist answers 400 with `type: INVALID_POOL`. Leave it out (or send it empty or `0`) for any pool.
+
+### Retrying safely
+
+Send an `Idempotency-Key` header so a retry after a timeout cannot buy twice.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiPurchaseSmsRequest
@@ -127,6 +151,20 @@ Please refer to the API documentation for more details on how to use this endpoi
 	RequestHistoryExecute(r ApiRequestHistoryRequest) (interface{}, *http.Response, error)
 
 	/*
+	RequestHistorySearch Search order history
+
+	One step of a search through your order history, newest orders first. Each call reads a bounded slice of your orders and returns the matches in it plus `next`. Pass `next` back as `cursor` to continue; the search is complete when `next` is `null`. A call can return no matches and still have a `next`.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiRequestHistorySearchRequest
+	*/
+	RequestHistorySearch(ctx context.Context) ApiRequestHistorySearchRequest
+
+	// RequestHistorySearchExecute executes the request
+	//  @return interface{}
+	RequestHistorySearchExecute(r ApiRequestHistorySearchRequest) (interface{}, *http.Response, error)
+
+	/*
 	SmsActivate Activate SMS
 
 	This endpoint will forcefully activate an SMS to set it available for future resends, please keep in mind that these orders are NOT eligible for a refund after activating them.
@@ -143,22 +181,9 @@ Please refer to the API documentation for more details on how to use this endpoi
 	/*
 	SmsAllStock One-time stock for all services
 
-	This API endpoint is used to retrieve one-time SMS stock in the SMSPool system. The HTTP POST request should be sent to `https://api.smspool.net/sms/stock`.
+	Retrieves the one-time SMS stock for every country, service and pool, optionally filtered by `country`, `service` and `pool`. The API key is optional.
 
-### Request Parameters
-
-The \`key\` parameter is required for this endpoint, this is your API key.
-
-### Response
-
-The response for this API endpoint will have a status code of 200, indicating a successful request. The response body will be in JSON format and will contain the following properties:
-
-- `success` (integer): A flag indicating the success of the request. A value of 0 indicates failure.
-    
-- `message` (string): An optional message providing additional information about the request. In this case, the message is empty.
-    
-
-Please note that the response may contain additional properties not mentioned here, but they can be ignored for the purpose of this documentation.
+The unfiltered list is large and rebuilt once a minute. It is sent with `ETag`, `Last-Modified` and `Cache-Control` headers: send `If-None-Match` (or `If-Modified-Since`) with your next request and you get `304 Not Modified` with no body while the list has not changed.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiSmsAllStockRequest
@@ -170,14 +195,27 @@ Please note that the response may contain additional properties not mentioned he
 	SmsAllStockExecute(r ApiSmsAllStockRequest) (interface{}, *http.Response, error)
 
 	/*
+	SmsArchive Archive one order
+
+	Removes one finished order from your active orders. Nothing is refunded and the order stays in your history; `/sms/unarchive` brings it back. An order that is still waiting for an SMS cannot be archived: cancel it with `/sms/cancel` instead.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiSmsArchiveRequest
+	*/
+	SmsArchive(ctx context.Context) ApiSmsArchiveRequest
+
+	// SmsArchiveExecute executes the request
+	//  @return interface{}
+	SmsArchiveExecute(r ApiSmsArchiveRequest) (interface{}, *http.Response, error)
+
+	/*
 	SmsCancel Cancel SMS
 
-	# Cancel your SMS order
+	Cancels an order. An order that has not received a code is cancelled and refunded. An order that already has its code cannot be refunded; it is only archived (removed from your active orders).
 
-## Responses
+Both answer `success: 1`; `action` tells them apart: `refunded` or `archived`.
 
-| **Success** | {"success":1} |
-| **Fail** | {"success":0} |
+Send `orderids` (comma-separated) to cancel several orders at once; the response then lists one result per order under `results`.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiSmsCancelRequest
@@ -257,7 +295,7 @@ Please note that the response may contain additional properties not mentioned he
 	/*
 	SmsMissed Missed SMS
 
-	Some messages arrive on a number from your one-time orders but cannot finish the order, such as Ticketmaster and Seated codes or Hark reward payouts. This returns those messages, the same ones the Missed SMS tool on the website shows. Only numbers from pool Foxtrot are covered.
+	Some messages arrive on a number from your one-time orders but cannot finish the order, such as Ticketmaster and Seated codes, Hark reward payouts or Neon Money Talks messages. This returns those messages, the same ones the Missed SMS tool on the website shows. Only numbers from pool Foxtrot are covered.
 
 The newest messages come first. `url`, `code` and `email` hold the first link, code and email address found in the message, or an empty string.
 
@@ -308,22 +346,16 @@ Resend the order. Keep in mind that some pools will have a charge per resend. Yo
 	/*
 	SmsStock One-time SMS stock
 
-	This API endpoint is used to retrieve one-time SMS stock in the SMSPool system. The HTTP POST request should be sent to `https://api.smspool.net/sms/stock`.
+	Retrieves the one-time SMS stock for a country and service, optionally for one pool.
 
 ### Request Parameters
 
-The \`key\` parameter is required for this endpoint, this is your API key.
+The API key is optional. Without it the request is limited to 20 calls a minute per IP address; with it the limit is 200 a minute.
 
 ### Response
 
-The response for this API endpoint will have a status code of 200, indicating a successful request. The response body will be in JSON format and will contain the following properties:
-
-- `success` (integer): A flag indicating the success of the request. A value of 0 indicates failure.
-    
-- `message` (string): An optional message providing additional information about the request. In this case, the message is empty.
-    
-
-Please note that the response may contain additional properties not mentioned here, but they can be ignored for the purpose of this documentation.
+- `success` (integer): 1 when the stock could be read, 0 otherwise.
+- `amount` (integer): the numbers in stock.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiSmsStockRequest
@@ -356,6 +388,7 @@ type ApiPurchaseSmsRequest struct {
 	ctx context.Context
 	ApiService SMSAPI
 	service *string
+	idempotencyKey *string
 	country *string
 	pool *string
 	maxPrice *float32
@@ -367,6 +400,8 @@ type ApiPurchaseSmsRequest struct {
 	activationType *string
 	carrier *int32
 	phonenumber *int32
+	autoCountry *int32
+	response *string
 	software *int32
 }
 
@@ -376,13 +411,18 @@ func (r ApiPurchaseSmsRequest) Service(service string) ApiPurchaseSmsRequest {
 	return r
 }
 
+func (r ApiPurchaseSmsRequest) IdempotencyKey(idempotencyKey string) ApiPurchaseSmsRequest {
+	r.idempotencyKey = &idempotencyKey
+	return r
+}
+
 // The country in ISO format or number retrieved from the &#x60;Country List&#x60; endpoint
 func (r ApiPurchaseSmsRequest) Country(country string) ApiPurchaseSmsRequest {
 	r.country = &country
 	return r
 }
 
-// The pool or number retrieved from the &#x60;Pool List&#x60; endpoint (optional)
+// The pool ID or name retrieved from the &#x60;Pool List&#x60; endpoint (optional). An unknown name answers 400 &#x60;INVALID_POOL&#x60;.
 func (r ApiPurchaseSmsRequest) Pool(pool string) ApiPurchaseSmsRequest {
 	r.pool = &pool
 	return r
@@ -400,7 +440,7 @@ func (r ApiPurchaseSmsRequest) PricingOption(pricingOption int32) ApiPurchaseSms
 	return r
 }
 
-// Quantity of numbers ordered
+// Quantity of numbers ordered, 1 to 20. Must be a whole number.
 func (r ApiPurchaseSmsRequest) Quantity(quantity int32) ApiPurchaseSmsRequest {
 	r.quantity = &quantity
 	return r
@@ -436,9 +476,21 @@ func (r ApiPurchaseSmsRequest) Carrier(carrier int32) ApiPurchaseSmsRequest {
 	return r
 }
 
-// In case you want to select a specific phone number to order
+// In case you want to select a specific phone number to order. Digits with the country code; a leading +, spaces and dashes are ignored.
 func (r ApiPurchaseSmsRequest) Phonenumber(phonenumber int32) ApiPurchaseSmsRequest {
 	r.phonenumber = &phonenumber
+	return r
+}
+
+// Set to 1 to let SMSPool pick the country: every country with stock is scored on its expected success rate (estimated from the country&#39;s record across all services when the service has few orders there; weighed down when little stock backs it, minus a little per dollar) with a bonus for a local number, the country your request&#39;s IP resolves to; with pricing_option&#x3D;1 the cheapest country close to the best score wins. Ignored when country is sent. The response then carries auto_country with the chosen country and the reason.
+func (r ApiPurchaseSmsRequest) AutoCountry(autoCountry int32) ApiPurchaseSmsRequest {
+	r.autoCountry = &autoCountry
+	return r
+}
+
+// Set to &#x60;v2&#x60; for one response shape whatever the quantity: &#x60;{success, orders, failed, message}&#x60;. Leave out for the legacy shapes.
+func (r ApiPurchaseSmsRequest) Response(response string) ApiPurchaseSmsRequest {
+	r.response = &response
 	return r
 }
 
@@ -453,6 +505,30 @@ func (r ApiPurchaseSmsRequest) Execute() (interface{}, *http.Response, error) {
 
 /*
 PurchaseSms Order SMS
+
+Orders one or more numbers for a service.
+
+### Response shapes
+
+Without `response=v2` the shape depends on `quantity`: one number returns the order object; several return a JSON array of order objects; if ordering stops part-way, an object with the orders bought so far under `"0"`, `"1"`, ... plus `message`.
+
+With `response=v2` every case returns the same object:
+
+- `success`: 1 when every requested number was ordered, otherwise 0
+- `orders`: the orders that were placed (may be empty)
+- `failed`: the error that stopped the request, as a one-element list (empty on success)
+- `message`: a summary
+- `auto_country`: only with `auto_country=1`, the chosen country
+
+`response=v2` is ignored together with `create_token=1`.
+
+### Pool
+
+`pool` is a pool ID or name from the `Pool List` endpoint. A name that does not exist answers 400 with `type: INVALID_POOL`. Leave it out (or send it empty or `0`) for any pool.
+
+### Retrying safely
+
+Send an `Idempotency-Key` header so a retry after a timeout cannot buy twice.
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @return ApiPurchaseSmsRequest
@@ -505,6 +581,9 @@ func (a *SMSAPIService) PurchaseSmsExecute(r ApiPurchaseSmsRequest) (interface{}
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
+	if r.idempotencyKey != nil {
+		parameterAddToHeaderOrQuery(localVarHeaderParams, "Idempotency-Key", r.idempotencyKey, "simple", "")
+	}
 	if r.country != nil {
 		parameterAddToHeaderOrQuery(localVarFormParams, "country", r.country, "", "")
 	}
@@ -539,6 +618,12 @@ func (a *SMSAPIService) PurchaseSmsExecute(r ApiPurchaseSmsRequest) (interface{}
 	if r.phonenumber != nil {
 		parameterAddToHeaderOrQuery(localVarFormParams, "phonenumber", r.phonenumber, "", "")
 	}
+	if r.autoCountry != nil {
+		parameterAddToHeaderOrQuery(localVarFormParams, "auto_country", r.autoCountry, "", "")
+	}
+	if r.response != nil {
+		parameterAddToHeaderOrQuery(localVarFormParams, "response", r.response, "", "")
+	}
 	if r.software != nil {
 		parameterAddToHeaderOrQuery(localVarFormParams, "software", r.software, "", "")
 	}
@@ -564,6 +649,17 @@ func (a *SMSAPIService) PurchaseSmsExecute(r ApiPurchaseSmsRequest) (interface{}
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
+		if localVarHTTPResponse.StatusCode == 400 {
+			var v interface{}
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
 		if localVarHTTPResponse.StatusCode == 401 {
 			var v interface{}
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
@@ -576,6 +672,17 @@ func (a *SMSAPIService) PurchaseSmsExecute(r ApiPurchaseSmsRequest) (interface{}
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 403 {
+			var v interface{}
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 409 {
 			var v interface{}
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
@@ -980,6 +1087,27 @@ func (a *SMSAPIService) RequestAreacodesExecute(r ApiRequestAreacodesRequest) (i
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v interface{}
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v interface{}
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		}
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -1146,6 +1274,168 @@ func (a *SMSAPIService) RequestHistoryExecute(r ApiRequestHistoryRequest) (inter
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 403 {
+			var v interface{}
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiRequestHistorySearchRequest struct {
+	ctx context.Context
+	ApiService SMSAPI
+	search *string
+	cursor *string
+	limit *int32
+}
+
+// The search term, as typed into the order history&#39;s search box. At most 32 characters.
+func (r ApiRequestHistorySearchRequest) Search(search string) ApiRequestHistorySearchRequest {
+	r.search = &search
+	return r
+}
+
+// &#x60;next&#x60; from the previous call. Leave out for the first call.
+func (r ApiRequestHistorySearchRequest) Cursor(cursor string) ApiRequestHistorySearchRequest {
+	r.cursor = &cursor
+	return r
+}
+
+// Matches per call, 1 to 500 (default 100).
+func (r ApiRequestHistorySearchRequest) Limit(limit int32) ApiRequestHistorySearchRequest {
+	r.limit = &limit
+	return r
+}
+
+func (r ApiRequestHistorySearchRequest) Execute() (interface{}, *http.Response, error) {
+	return r.ApiService.RequestHistorySearchExecute(r)
+}
+
+/*
+RequestHistorySearch Search order history
+
+One step of a search through your order history, newest orders first. Each call reads a bounded slice of your orders and returns the matches in it plus `next`. Pass `next` back as `cursor` to continue; the search is complete when `next` is `null`. A call can return no matches and still have a `next`.
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @return ApiRequestHistorySearchRequest
+*/
+func (a *SMSAPIService) RequestHistorySearch(ctx context.Context) ApiRequestHistorySearchRequest {
+	return ApiRequestHistorySearchRequest{
+		ApiService: a,
+		ctx: ctx,
+	}
+}
+
+// Execute executes the request
+//  @return interface{}
+func (a *SMSAPIService) RequestHistorySearchExecute(r ApiRequestHistorySearchRequest) (interface{}, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodPost
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  interface{}
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SMSAPIService.RequestHistorySearch")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/request/history_search"
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.search == nil {
+		return localVarReturnValue, nil, reportError("search is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/x-www-form-urlencoded"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	parameterAddToHeaderOrQuery(localVarFormParams, "search", r.search, "", "")
+	if r.cursor != nil {
+		parameterAddToHeaderOrQuery(localVarFormParams, "cursor", r.cursor, "", "")
+	}
+	if r.limit != nil {
+		parameterAddToHeaderOrQuery(localVarFormParams, "limit", r.limit, "", "")
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v interface{}
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v interface{}
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 422 {
 			var v interface{}
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
@@ -1355,22 +1645,9 @@ func (r ApiSmsAllStockRequest) Execute() (interface{}, *http.Response, error) {
 /*
 SmsAllStock One-time stock for all services
 
-This API endpoint is used to retrieve one-time SMS stock in the SMSPool system. The HTTP POST request should be sent to `https://api.smspool.net/sms/stock`.
+Retrieves the one-time SMS stock for every country, service and pool, optionally filtered by `country`, `service` and `pool`. The API key is optional.
 
-### Request Parameters
-
-The \`key\` parameter is required for this endpoint, this is your API key.
-
-### Response
-
-The response for this API endpoint will have a status code of 200, indicating a successful request. The response body will be in JSON format and will contain the following properties:
-
-- `success` (integer): A flag indicating the success of the request. A value of 0 indicates failure.
-    
-- `message` (string): An optional message providing additional information about the request. In this case, the message is empty.
-    
-
-Please note that the response may contain additional properties not mentioned here, but they can be ignored for the purpose of this documentation.
+The unfiltered list is large and rebuilt once a minute. It is sent with `ETag`, `Last-Modified` and `Cache-Control` headers: send `If-None-Match` (or `If-Modified-Since`) with your next request and you get `304 Not Modified` with no body while the list has not changed.
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @return ApiSmsAllStockRequest
@@ -1466,6 +1743,137 @@ func (a *SMSAPIService) SmsAllStockExecute(r ApiSmsAllStockRequest) (interface{}
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
+type ApiSmsArchiveRequest struct {
+	ctx context.Context
+	ApiService SMSAPI
+	orderid *string
+}
+
+// The order code from the &#x60;Order SMS&#x60; endpoint.
+func (r ApiSmsArchiveRequest) Orderid(orderid string) ApiSmsArchiveRequest {
+	r.orderid = &orderid
+	return r
+}
+
+func (r ApiSmsArchiveRequest) Execute() (interface{}, *http.Response, error) {
+	return r.ApiService.SmsArchiveExecute(r)
+}
+
+/*
+SmsArchive Archive one order
+
+Removes one finished order from your active orders. Nothing is refunded and the order stays in your history; `/sms/unarchive` brings it back. An order that is still waiting for an SMS cannot be archived: cancel it with `/sms/cancel` instead.
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @return ApiSmsArchiveRequest
+*/
+func (a *SMSAPIService) SmsArchive(ctx context.Context) ApiSmsArchiveRequest {
+	return ApiSmsArchiveRequest{
+		ApiService: a,
+		ctx: ctx,
+	}
+}
+
+// Execute executes the request
+//  @return interface{}
+func (a *SMSAPIService) SmsArchiveExecute(r ApiSmsArchiveRequest) (interface{}, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodPost
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  interface{}
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SMSAPIService.SmsArchive")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/sms/archive"
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.orderid == nil {
+		return localVarReturnValue, nil, reportError("orderid is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/x-www-form-urlencoded"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	parameterAddToHeaderOrQuery(localVarFormParams, "orderid", r.orderid, "", "")
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v interface{}
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v interface{}
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
 type ApiSmsCancelRequest struct {
 	ctx context.Context
 	ApiService SMSAPI
@@ -1502,12 +1910,11 @@ func (r ApiSmsCancelRequest) Execute() (interface{}, *http.Response, error) {
 /*
 SmsCancel Cancel SMS
 
-# Cancel your SMS order
+Cancels an order. An order that has not received a code is cancelled and refunded. An order that already has its code cannot be refunded; it is only archived (removed from your active orders).
 
-## Responses
+Both answer `success: 1`; `action` tells them apart: `refunded` or `archived`.
 
-| **Success** | {"success":1} |
-| **Fail** | {"success":0} |
+Send `orderids` (comma-separated) to cancel several orders at once; the response then lists one result per order under `results`.
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @return ApiSmsCancelRequest
@@ -2207,7 +2614,7 @@ func (r ApiSmsMissedRequest) Execute() (interface{}, *http.Response, error) {
 /*
 SmsMissed Missed SMS
 
-Some messages arrive on a number from your one-time orders but cannot finish the order, such as Ticketmaster and Seated codes or Hark reward payouts. This returns those messages, the same ones the Missed SMS tool on the website shows. Only numbers from pool Foxtrot are covered.
+Some messages arrive on a number from your one-time orders but cannot finish the order, such as Ticketmaster and Seated codes, Hark reward payouts or Neon Money Talks messages. This returns those messages, the same ones the Missed SMS tool on the website shows. Only numbers from pool Foxtrot are covered.
 
 The newest messages come first. `url`, `code` and `email` hold the first link, code and email address found in the message, or an empty string.
 
@@ -2651,22 +3058,16 @@ func (r ApiSmsStockRequest) Execute() (interface{}, *http.Response, error) {
 /*
 SmsStock One-time SMS stock
 
-This API endpoint is used to retrieve one-time SMS stock in the SMSPool system. The HTTP POST request should be sent to `https://api.smspool.net/sms/stock`.
+Retrieves the one-time SMS stock for a country and service, optionally for one pool.
 
 ### Request Parameters
 
-The \`key\` parameter is required for this endpoint, this is your API key.
+The API key is optional. Without it the request is limited to 20 calls a minute per IP address; with it the limit is 200 a minute.
 
 ### Response
 
-The response for this API endpoint will have a status code of 200, indicating a successful request. The response body will be in JSON format and will contain the following properties:
-
-- `success` (integer): A flag indicating the success of the request. A value of 0 indicates failure.
-    
-- `message` (string): An optional message providing additional information about the request. In this case, the message is empty.
-    
-
-Please note that the response may contain additional properties not mentioned here, but they can be ignored for the purpose of this documentation.
+- `success` (integer): 1 when the stock could be read, 0 otherwise.
+- `amount` (integer): the numbers in stock.
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @return ApiSmsStockRequest

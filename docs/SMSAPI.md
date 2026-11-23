@@ -9,8 +9,10 @@ Method | HTTP request | Description
 [**RequestArchive**](SMSAPI.md#RequestArchive) | **Post** /request/archive | Archive all orders
 [**RequestAreacodes**](SMSAPI.md#RequestAreacodes) | **Post** /request/areacodes | Request available areacodes
 [**RequestHistory**](SMSAPI.md#RequestHistory) | **Post** /request/history | Order History
+[**RequestHistorySearch**](SMSAPI.md#RequestHistorySearch) | **Post** /request/history_search | Search order history
 [**SmsActivate**](SMSAPI.md#SmsActivate) | **Post** /sms/activate | Activate SMS
 [**SmsAllStock**](SMSAPI.md#SmsAllStock) | **Post** /sms/all_stock | One-time stock for all services
+[**SmsArchive**](SMSAPI.md#SmsArchive) | **Post** /sms/archive | Archive one order
 [**SmsCancel**](SMSAPI.md#SmsCancel) | **Post** /sms/cancel | Cancel SMS
 [**SmsCancelAll**](SMSAPI.md#SmsCancelAll) | **Post** /sms/cancel_all | Cancel All SMS
 [**SmsCheck**](SMSAPI.md#SmsCheck) | **Post** /sms/check | Check SMS
@@ -26,9 +28,11 @@ Method | HTTP request | Description
 
 ## PurchaseSms
 
-> interface{} PurchaseSms(ctx).Service(service).Country(country).Pool(pool).MaxPrice(maxPrice).PricingOption(pricingOption).Quantity(quantity).Areacode(areacode).Exclude(exclude).CreateToken(createToken).ActivationType(activationType).Carrier(carrier).Phonenumber(phonenumber).Software(software).Execute()
+> interface{} PurchaseSms(ctx).Service(service).IdempotencyKey(idempotencyKey).Country(country).Pool(pool).MaxPrice(maxPrice).PricingOption(pricingOption).Quantity(quantity).Areacode(areacode).Exclude(exclude).CreateToken(createToken).ActivationType(activationType).Carrier(carrier).Phonenumber(phonenumber).AutoCountry(autoCountry).Response(response).Software(software).Execute()
 
 Order SMS
+
+
 
 ### Example
 
@@ -44,22 +48,25 @@ import (
 
 func main() {
 	service := "service_example" // string | The service or number retrieved from the `Service List` endpoint
+	idempotencyKey := "3f1c2c0e-7d5b-4a52-9a53-1f6f0f0f2b11" // string |  (optional)
 	country := "country_example" // string | The country in ISO format or number retrieved from the `Country List` endpoint (optional)
-	pool := "pool_example" // string | The pool or number retrieved from the `Pool List` endpoint (optional) (optional)
+	pool := "pool_example" // string | The pool ID or name retrieved from the `Pool List` endpoint (optional). An unknown name answers 400 `INVALID_POOL`. (optional)
 	maxPrice := float32(8.14) // float32 | The max price you are willing to pay per number (optional)
 	pricingOption := int32(56) // int32 | Set to 0 if you'd like the cheapest numbers, set to 1 for highest success rate (optional)
-	quantity := int32(56) // int32 | Quantity of numbers ordered (optional)
+	quantity := int32(56) // int32 | Quantity of numbers ordered, 1 to 20. Must be a whole number. (optional)
 	areacode := "areacode_example" // string | Areacodes you would like to include or exclude in JSON format (optional)
 	exclude := int32(56) // int32 | Set exclude to 1 if you would like to exclude all listed area codes. (optional)
 	createToken := int32(56) // int32 | Optional param; set to 1 if you'd like to create a token link that anyone can access. (optional)
 	activationType := "activationType_example" // string | Options: SMS, VOICE, FLASH. SMS will receive regular SMS, VOICE will receive phone calls that mentions the SMS and FLASH is for FLASH calls for verification. (optional)
 	carrier := int32(56) // int32 | Options: 1 or 2. Pick a carrier (only works for pool Foxtrot US) (optional)
-	phonenumber := int32(56) // int32 | In case you want to select a specific phone number to order (optional)
+	phonenumber := int32(56) // int32 | In case you want to select a specific phone number to order. Digits with the country code; a leading +, spaces and dashes are ignored. (optional)
+	autoCountry := int32(56) // int32 | Set to 1 to let SMSPool pick the country: every country with stock is scored on its expected success rate (estimated from the country's record across all services when the service has few orders there; weighed down when little stock backs it, minus a little per dollar) with a bonus for a local number, the country your request's IP resolves to; with pricing_option=1 the cheapest country close to the best score wins. Ignored when country is sent. The response then carries auto_country with the chosen country and the reason. (optional)
+	response := "response_example" // string | Set to `v2` for one response shape whatever the quantity: `{success, orders, failed, message}`. Leave out for the legacy shapes. (optional)
 	software := int32(56) // int32 |  (optional)
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
-	resp, r, err := apiClient.SMSAPI.PurchaseSms(context.Background()).Service(service).Country(country).Pool(pool).MaxPrice(maxPrice).PricingOption(pricingOption).Quantity(quantity).Areacode(areacode).Exclude(exclude).CreateToken(createToken).ActivationType(activationType).Carrier(carrier).Phonenumber(phonenumber).Software(software).Execute()
+	resp, r, err := apiClient.SMSAPI.PurchaseSms(context.Background()).Service(service).IdempotencyKey(idempotencyKey).Country(country).Pool(pool).MaxPrice(maxPrice).PricingOption(pricingOption).Quantity(quantity).Areacode(areacode).Exclude(exclude).CreateToken(createToken).ActivationType(activationType).Carrier(carrier).Phonenumber(phonenumber).AutoCountry(autoCountry).Response(response).Software(software).Execute()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error when calling `SMSAPI.PurchaseSms``: %v\n", err)
 		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
@@ -81,17 +88,20 @@ Other parameters are passed through a pointer to a apiPurchaseSmsRequest struct 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
  **service** | **string** | The service or number retrieved from the &#x60;Service List&#x60; endpoint | 
+ **idempotencyKey** | **string** |  | 
  **country** | **string** | The country in ISO format or number retrieved from the &#x60;Country List&#x60; endpoint | 
- **pool** | **string** | The pool or number retrieved from the &#x60;Pool List&#x60; endpoint (optional) | 
+ **pool** | **string** | The pool ID or name retrieved from the &#x60;Pool List&#x60; endpoint (optional). An unknown name answers 400 &#x60;INVALID_POOL&#x60;. | 
  **maxPrice** | **float32** | The max price you are willing to pay per number | 
  **pricingOption** | **int32** | Set to 0 if you&#39;d like the cheapest numbers, set to 1 for highest success rate | 
- **quantity** | **int32** | Quantity of numbers ordered | 
+ **quantity** | **int32** | Quantity of numbers ordered, 1 to 20. Must be a whole number. | 
  **areacode** | **string** | Areacodes you would like to include or exclude in JSON format | 
  **exclude** | **int32** | Set exclude to 1 if you would like to exclude all listed area codes. | 
  **createToken** | **int32** | Optional param; set to 1 if you&#39;d like to create a token link that anyone can access. | 
  **activationType** | **string** | Options: SMS, VOICE, FLASH. SMS will receive regular SMS, VOICE will receive phone calls that mentions the SMS and FLASH is for FLASH calls for verification. | 
  **carrier** | **int32** | Options: 1 or 2. Pick a carrier (only works for pool Foxtrot US) | 
- **phonenumber** | **int32** | In case you want to select a specific phone number to order | 
+ **phonenumber** | **int32** | In case you want to select a specific phone number to order. Digits with the country code; a leading +, spaces and dashes are ignored. | 
+ **autoCountry** | **int32** | Set to 1 to let SMSPool pick the country: every country with stock is scored on its expected success rate (estimated from the country&#39;s record across all services when the service has few orders there; weighed down when little stock backs it, minus a little per dollar) with a bonus for a local number, the country your request&#39;s IP resolves to; with pricing_option&#x3D;1 the cheapest country close to the best score wins. Ignored when country is sent. The response then carries auto_country with the chosen country and the reason. | 
+ **response** | **string** | Set to &#x60;v2&#x60; for one response shape whatever the quantity: &#x60;{success, orders, failed, message}&#x60;. Leave out for the legacy shapes. | 
  **software** | **int32** |  | 
 
 ### Return type
@@ -290,7 +300,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[bearerAuth](../README.md#bearerAuth)
 
 ### HTTP request headers
 
@@ -353,6 +363,76 @@ Name | Type | Description  | Notes
  **start** | **int32** | Which row you&#39;d like to start from | 
  **length** | **int32** | Max length of all rows | 
  **search** | **string** | Search query for phone number, order_code, service or country | 
+
+### Return type
+
+**interface{}**
+
+### Authorization
+
+[bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+- **Content-Type**: application/x-www-form-urlencoded
+- **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
+## RequestHistorySearch
+
+> interface{} RequestHistorySearch(ctx).Search(search).Cursor(cursor).Limit(limit).Execute()
+
+Search order history
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/smspool/smspool-go"
+)
+
+func main() {
+	search := "search_example" // string | The search term, as typed into the order history's search box. At most 32 characters.
+	cursor := "cursor_example" // string | `next` from the previous call. Leave out for the first call. (optional)
+	limit := int32(56) // int32 | Matches per call, 1 to 500 (default 100). (optional)
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.SMSAPI.RequestHistorySearch(context.Background()).Search(search).Cursor(cursor).Limit(limit).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `SMSAPI.RequestHistorySearch``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `RequestHistorySearch`: interface{}
+	fmt.Fprintf(os.Stdout, "Response from `SMSAPI.RequestHistorySearch`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiRequestHistorySearchRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **search** | **string** | The search term, as typed into the order history&#39;s search box. At most 32 characters. | 
+ **cursor** | **string** | &#x60;next&#x60; from the previous call. Leave out for the first call. | 
+ **limit** | **int32** | Matches per call, 1 to 500 (default 100). | 
 
 ### Return type
 
@@ -497,6 +577,72 @@ Name | Type | Description  | Notes
 ### Authorization
 
 No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: application/x-www-form-urlencoded
+- **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
+## SmsArchive
+
+> interface{} SmsArchive(ctx).Orderid(orderid).Execute()
+
+Archive one order
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/smspool/smspool-go"
+)
+
+func main() {
+	orderid := "orderid_example" // string | The order code from the `Order SMS` endpoint.
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.SMSAPI.SmsArchive(context.Background()).Orderid(orderid).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `SMSAPI.SmsArchive``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `SmsArchive`: interface{}
+	fmt.Fprintf(os.Stdout, "Response from `SMSAPI.SmsArchive`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiSmsArchiveRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **orderid** | **string** | The order code from the &#x60;Order SMS&#x60; endpoint. | 
+
+### Return type
+
+**interface{}**
+
+### Authorization
+
+[bearerAuth](../README.md#bearerAuth)
 
 ### HTTP request headers
 

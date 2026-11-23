@@ -85,6 +85,8 @@ No authorization required
 
 Retrieve all pricing
 
+
+
 ### Example
 
 ```go
