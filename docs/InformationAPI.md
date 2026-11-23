@@ -7,6 +7,7 @@ Method | HTTP request | Description
 [**CountryRetrieveAll**](InformationAPI.md#CountryRetrieveAll) | **Get** /country/retrieve_all | Country list
 [**PoolRetrieveAll**](InformationAPI.md#PoolRetrieveAll) | **Post** /pool/retrieve_all | Pool list
 [**PoolRetrieveValid**](InformationAPI.md#PoolRetrieveValid) | **Post** /pool/retrieve_valid | Suggested Pools
+[**RequestAutoCountry**](InformationAPI.md#RequestAutoCountry) | **Post** /request/auto_country | Pick the best country for a service
 [**RequestBalance**](InformationAPI.md#RequestBalance) | **Post** /request/balance | Balance
 [**RequestSuccessRate**](InformationAPI.md#RequestSuccessRate) | **Post** /request/success_rate | Retrieve country success rates per service
 [**RequestSuggestedCountries**](InformationAPI.md#RequestSuggestedCountries) | **Post** /request/suggested_countries | Suggested Countries
@@ -194,6 +195,74 @@ Name | Type | Description  | Notes
  **country** | **string** | Country retrieved from &#39;&#39;Country list\\\&quot; endpoint | 
  **web** | **string** | Return array format | 
  **includeStock** | **string** |  | 
+
+### Return type
+
+**interface{}**
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: application/x-www-form-urlencoded
+- **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
+## RequestAutoCountry
+
+> interface{} RequestAutoCountry(ctx).Service(service).PricingOption(pricingOption).Execute()
+
+Pick the best country for a service
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/smspool/smspool-go"
+)
+
+func main() {
+	service := "service_example" // string | Service name or service ID which can be retrieved at the /service/retrieve_all endpoint
+	pricingOption := int32(56) // int32 | Set to 1 to prefer the cheapest country among those close to the best score; 0 (default) picks purely on the score. (optional)
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.InformationAPI.RequestAutoCountry(context.Background()).Service(service).PricingOption(pricingOption).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `InformationAPI.RequestAutoCountry``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `RequestAutoCountry`: interface{}
+	fmt.Fprintf(os.Stdout, "Response from `InformationAPI.RequestAutoCountry`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiRequestAutoCountryRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **service** | **string** | Service name or service ID which can be retrieved at the /service/retrieve_all endpoint | 
+ **pricingOption** | **int32** | Set to 1 to prefer the cheapest country among those close to the best score; 0 (default) picks purely on the score. | 
 
 ### Return type
 

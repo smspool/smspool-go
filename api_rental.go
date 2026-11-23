@@ -1,7 +1,7 @@
 /*
 SMSPool API
 
-Every endpoint accepts its parameters as form fields (POST) or query parameters (GET).  Authenticate with your API key from https://www.smspool.net/my/settings, either as a bearer token (`Authorization: Bearer <key>`) or as a `key` parameter.
+Every endpoint accepts its parameters as form fields (POST) or query parameters (GET). A JSON object body (`Content-Type: application/json`) works too: its top-level fields are read as parameters; a parameter that is also in the query string or form body wins.  Authenticate with your API key from https://www.smspool.net/my/settings as a bearer token: `Authorization: Bearer <key>`. A `key` field in a POST body works too. Keep the key out of the URL: a URL is saved in browser history and can be recorded by proxies and logs on the way to us.  Use of the API is subject to the [Terms of Service](https://www.smspool.net/tos#api). Article 11 covers API use: sanctions and geographic restrictions, what you must require of your own users if you resell the service, and the safekeeping of keys.  ## Errors  An error answers with `success: 0`, a human-readable `message` and, where the API can name the cause, a machine-readable `type`. Check `type`, not the text of `message`. Parameter and key errors also carry `errors`, one entry per problem (`message`, `param`, `type`); the top-level `message` and `type` repeat the API key's entry when there is one, otherwise the first.  | `type` | HTTP | Meaning | | --- | --- | --- | | `MISSING_PARAMETER` | 400 | A required parameter was not sent | | `INVALID_PARAMETER` | varies | A parameter has a value the endpoint cannot use | | `INVALID_POOL` | 400 | `/purchase/sms`: the `pool` name does not exist | | `INVALID_KEY` | 401 / 403 | The API key is malformed (401) or unknown or revoked (403) | | `API_KEY_SCOPE` | 403 | The API key is not allowed to call this endpoint, or not from this IP address | | `RATE_LIMITED` | 429 | Too many requests; wait for the `Retry-After` header's seconds | | `IDEMPOTENCY_IN_PROGRESS` | 409 | The first request with this `Idempotency-Key` has not finished |  Endpoints add their own types (for example `OUT_OF_STOCK`). Older errors may have no `type`.  ## Idempotent purchases  `/purchase/sms`, `/purchase/rental`, `/esim/purchase` and `/voucher/generate` accept an optional `Idempotency-Key` header (or an `idempotency_key` parameter): 1 to 128 printable ASCII characters that you choose, unique per purchase, for example a UUID. If a request times out, send it again with the same key:  - the first request runs normally; - a repeat within 24 hours answers with the first request's status and body and the header `Idempotent-Replay: true`, and buys nothing; - a repeat while the first is still running answers `409` with `type: IDEMPOTENCY_IN_PROGRESS`; retry shortly.  A request that bought nothing (`success: 0`) does not use up its key, so it can be retried with the same one. A key belongs to your account and the endpoint. Requests without a key behave as they always have.  ## Webhooks  Instead of polling `/sms/check`, set a webhook URL under Settings → Developer and receive each SMS as a signed JSON `POST`. The events are listed under Webhooks below; setup, retries and signature checks are described in [How to set up webhooks](https://www.smspool.net/article/how-to-setup-webhooks-for-smspool-ec19b80ade92).  ## Health check  `GET /up` needs no key and answers `200 {\"status\":\"ok\",...}` or `503 {\"status\":\"degraded\",...}`.
 
 API version: 1.0
 */
@@ -160,6 +160,8 @@ type RentalAPI interface {
 	/*
 	RentalRetrieveMessages Retrieve Rental Messages
 
+	Successful answers are cached for 3 seconds per rental, so polling faster than that returns the same data.
+
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiRentalRetrieveMessagesRequest
 	*/
@@ -195,6 +197,8 @@ type RentalAPI interface {
 
 	/*
 	RentalRetrieveStatus Retrieve Rental Status
+
+	Successful answers are cached for 3 seconds per rental, so polling faster than that returns the same data.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiRentalRetrieveStatusRequest
@@ -240,6 +244,7 @@ type ApiPurchaseRentalRequest struct {
 	ApiService RentalAPI
 	id *int32
 	days *int32
+	idempotencyKey *string
 	serviceId *int32
 	createToken *int32
 	city *string
@@ -255,6 +260,11 @@ func (r ApiPurchaseRentalRequest) Id(id int32) ApiPurchaseRentalRequest {
 
 func (r ApiPurchaseRentalRequest) Days(days int32) ApiPurchaseRentalRequest {
 	r.days = &days
+	return r
+}
+
+func (r ApiPurchaseRentalRequest) IdempotencyKey(idempotencyKey string) ApiPurchaseRentalRequest {
+	r.idempotencyKey = &idempotencyKey
 	return r
 }
 
@@ -346,6 +356,9 @@ func (a *RentalAPIService) PurchaseRentalExecute(r ApiPurchaseRentalRequest) (in
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
+	if r.idempotencyKey != nil {
+		parameterAddToHeaderOrQuery(localVarHeaderParams, "Idempotency-Key", r.idempotencyKey, "simple", "")
+	}
 	parameterAddToHeaderOrQuery(localVarFormParams, "id", r.id, "", "")
 	parameterAddToHeaderOrQuery(localVarFormParams, "days", r.days, "", "")
 	if r.serviceId != nil {
@@ -408,6 +421,17 @@ func (a *RentalAPIService) PurchaseRentalExecute(r ApiPurchaseRentalRequest) (in
 			return localVarReturnValue, localVarHTTPResponse, newErr
 		}
 		if localVarHTTPResponse.StatusCode == 403 {
+			var v interface{}
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 409 {
 			var v interface{}
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
@@ -1649,6 +1673,8 @@ func (r ApiRentalRetrieveMessagesRequest) Execute() (interface{}, *http.Response
 /*
 RentalRetrieveMessages Retrieve Rental Messages
 
+Successful answers are cached for 3 seconds per rental, so polling faster than that returns the same data.
+
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @return ApiRentalRetrieveMessagesRequest
 */
@@ -2013,6 +2039,8 @@ func (r ApiRentalRetrieveStatusRequest) Execute() (interface{}, *http.Response, 
 
 /*
 RentalRetrieveStatus Retrieve Rental Status
+
+Successful answers are cached for 3 seconds per rental, so polling faster than that returns the same data.
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @return ApiRentalRetrieveStatusRequest
@@ -2388,6 +2416,27 @@ func (a *RentalAPIService) RentalStockExecute(r ApiRentalStockRequest) (interfac
 		newErr := &GenericOpenAPIError{
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
+		}
+		if localVarHTTPResponse.StatusCode == 401 {
+			var v interface{}
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		if localVarHTTPResponse.StatusCode == 403 {
+			var v interface{}
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		}
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}

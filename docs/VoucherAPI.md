@@ -143,7 +143,7 @@ Name | Type | Description  | Notes
 
 ## VoucherGenerate
 
-> interface{} VoucherGenerate(ctx).Amount(amount).Execute()
+> interface{} VoucherGenerate(ctx).Amount(amount).IdempotencyKey(idempotencyKey).Execute()
 
 Generate voucher
 
@@ -161,10 +161,11 @@ import (
 
 func main() {
 	amount := float32(8.14) // float32 | The amount per promocode
+	idempotencyKey := "3f1c2c0e-7d5b-4a52-9a53-1f6f0f0f2b11" // string |  (optional)
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
-	resp, r, err := apiClient.VoucherAPI.VoucherGenerate(context.Background()).Amount(amount).Execute()
+	resp, r, err := apiClient.VoucherAPI.VoucherGenerate(context.Background()).Amount(amount).IdempotencyKey(idempotencyKey).Execute()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error when calling `VoucherAPI.VoucherGenerate``: %v\n", err)
 		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
@@ -186,6 +187,7 @@ Other parameters are passed through a pointer to a apiVoucherGenerateRequest str
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
  **amount** | **float32** | The amount per promocode | 
+ **idempotencyKey** | **string** |  | 
 
 ### Return type
 

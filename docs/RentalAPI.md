@@ -25,7 +25,7 @@ Method | HTTP request | Description
 
 ## PurchaseRental
 
-> interface{} PurchaseRental(ctx).Id(id).Days(days).ServiceId(serviceId).CreateToken(createToken).City(city).State(state).Zipcode(zipcode).Execute()
+> interface{} PurchaseRental(ctx).Id(id).Days(days).IdempotencyKey(idempotencyKey).ServiceId(serviceId).CreateToken(createToken).City(city).State(state).Zipcode(zipcode).Execute()
 
 Order Rental
 
@@ -44,6 +44,7 @@ import (
 func main() {
 	id := int32(56) // int32 | Rental ID retrieved from Retrieve Rental IDs
 	days := int32(56) // int32 | 
+	idempotencyKey := "3f1c2c0e-7d5b-4a52-9a53-1f6f0f0f2b11" // string |  (optional)
 	serviceId := int32(56) // int32 | Optional value on which service you'd purchase the rental for (optional)
 	createToken := int32(56) // int32 | Create a rental token which allows you to share this specific rental (optional)
 	city := "city_example" // string |  (optional)
@@ -52,7 +53,7 @@ func main() {
 
 	configuration := openapiclient.NewConfiguration()
 	apiClient := openapiclient.NewAPIClient(configuration)
-	resp, r, err := apiClient.RentalAPI.PurchaseRental(context.Background()).Id(id).Days(days).ServiceId(serviceId).CreateToken(createToken).City(city).State(state).Zipcode(zipcode).Execute()
+	resp, r, err := apiClient.RentalAPI.PurchaseRental(context.Background()).Id(id).Days(days).IdempotencyKey(idempotencyKey).ServiceId(serviceId).CreateToken(createToken).City(city).State(state).Zipcode(zipcode).Execute()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error when calling `RentalAPI.PurchaseRental``: %v\n", err)
 		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
@@ -75,6 +76,7 @@ Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
  **id** | **int32** | Rental ID retrieved from Retrieve Rental IDs | 
  **days** | **int32** |  | 
+ **idempotencyKey** | **string** |  | 
  **serviceId** | **int32** | Optional value on which service you&#39;d purchase the rental for | 
  **createToken** | **int32** | Create a rental token which allows you to share this specific rental | 
  **city** | **string** |  | 
@@ -678,6 +680,8 @@ Other parameters are passed through a pointer to a apiRentalRetrieveHistoryReque
 
 Retrieve Rental Messages
 
+
+
 ### Example
 
 ```go
@@ -872,6 +876,8 @@ No authorization required
 
 Retrieve Rental Status
 
+
+
 ### Example
 
 ```go
@@ -1054,7 +1060,7 @@ Name | Type | Description  | Notes
 
 ### Authorization
 
-No authorization required
+[bearerAuth](../README.md#bearerAuth)
 
 ### HTTP request headers
 
